@@ -25,7 +25,7 @@ foreach ($dir in $dirsToSync) {
 }
 
 # Root manifests and metadata files
-$filesToSync = @("package.json", "gemini-extension.json", "README.md", "LICENSE")
+$filesToSync = @("package.json", "gemini-extension.json", "hooks.json", "README.md", "LICENSE")
 foreach ($file in $filesToSync) {
     $srcFile = Join-Path $repoRoot $file
     if (Test-Path $srcFile) {

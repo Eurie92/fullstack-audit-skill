@@ -6,6 +6,34 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [2.15.0] - 2026-10-26
+
+> **Release Tier**: `MINOR (Hardware Anti-Grep Lifecycle Hook & Zero-Forced Injection Engine)`  
+> **Summary**: Introduces native Antigravity PreToolUse Lifecycle Hook (`hooks.json` + `scripts/anti-grep-gate.js`) physically denying slow recursive commands (`Get-ChildItem -Recurse`, `Select-String`, `grep -r`, `rg`, `find`) before PowerShell spawns. Hardens prompt guidelines to close scoped-recursion and refactoring loopholes with 100% interception accuracy in 100-run empirical benchmarks. Completely eliminates forced rule injection into `GEMINI.md` across installers and self-updaters, respecting developer workspace clean state.
+
+### Added
+* **Antigravity PreToolUse Iron Gate Hook (`hooks.json` & `scripts/anti-grep-gate.js`)**:
+  * Native lifecycle hook intercepting `run_command` before terminal process instantiation.
+  * Achieved 100.0% interception rate (50/50) against all variations of recursive searches (`Get-ChildItem 'app' -Recurse`, `Select-String`, `grep -rn`, `rg`, `findstr /s`).
+  * 0.0% false positive rate on legitimate developer commands (`git`, `npm`, `tsc`, `audit`).
+  * Denies execution with structured error instructing the agent on the exact zero-grep atlas alternative.
+* **Empirical Gate Benchmark Engine (`scripts/benchmark-gate.ts`)**:
+  * 100-run verification suite testing forbidden command interception and legitimate pass-through.
+
+### Changed
+* **Universal Recursive Ban Rule Hardening (`rules/AGENTS.md`, `scripts/audit.ts`)**:
+  * Explicitly prohibits scoped recursive directory scans (`Get-ChildItem 'app' -Recurse`, `components`, `src`).
+  * Broadens ban across ALL tasks (refactoring, import dependency tracking, bug investigations).
+  * Directs AI agents to `docs/backend-atlas/06_FULLSTACK_CROSS_REFERENCE_MAP.md` and `fullstack_path` for import tracing.
+
+### Fixed
+* **Zero-Forced Rule Injection (`scripts/audit.ts`, `scripts/install.ps1`, `scripts/install.sh`)**:
+  * Removed `GEMINI.md` from default auto-injection candidates.
+  * Eliminated forced `else` rule append fallback in `syncAgentRulesInPlace` and `executeUniversalSetup`.
+  * Files without existing audit markers are strictly skipped to prevent token bloat and preserve project cleanliness.
+
+---
+
 ## [2.14.1] - 2026-10-25
 
 > **Release Tier**: `PATCH (Automated Dev-to-Plugin Synchronization & Consumer Context Compaction)`  

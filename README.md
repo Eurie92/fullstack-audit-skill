@@ -4,7 +4,7 @@
 > Sub-3ms deterministic codebase navigation for Antigravity, Cursor, Claude Code, Windsurf, OpenCode, Codex, and Hermes.  
 > Automatically indexes Next.js, React, Nuxt, SvelteKit, Astro, Remix, and backend APIs into zero-grep in-memory atlases.
 
-[![Version](https://img.shields.io/badge/version-2.14.1-blue.svg)](https://github.com/Eurie92/fullstack-audit-skill/releases)
+[![Version](https://img.shields.io/badge/version-2.15.0-blue.svg)](https://github.com/Eurie92/fullstack-audit-skill/releases)
 [![License: Apache 2.0](https://img.shields.io/badge/license-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Benchmark](https://img.shields.io/badge/benchmark-500%2F500%20passed%20(0.35ms)-brightgreen.svg)](docs/BENCHMARK_500_XNIGHT_REPORT.md)
 [![MCP Protocol](https://img.shields.io/badge/protocol-Model%20Context%20Protocol%20(MCP)-purple.svg)](https://modelcontextprotocol.io/)

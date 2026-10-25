@@ -259,18 +259,26 @@ $RuleParts.Add(@'
 
 $RuleBlock = $RuleParts -join "`n`n"
 
-# Target files to update: AGENTS.md, GEMINI.md, and CLAUDE.md
-$TargetsToUpdate = [System.Collections.Generic.List[string]]::new()
-if (Test-Path "AGENTS.md") { $TargetsToUpdate.Add("AGENTS.md") }
-if (Test-Path "GEMINI.md") { $TargetsToUpdate.Add("GEMINI.md") }
-if (Test-Path "CLAUDE.md") { $TargetsToUpdate.Add("CLAUDE.md") }
-
-if ($TargetsToUpdate.Count -eq 0) {
-    $TargetsToUpdate.Add("AGENTS.md")
-}
-
+# Target files to update: AGENTS.md and CLAUDE.md (GEMINI.md is never auto-injected to prevent Antigravity token duplication)
 $markerPattern = "(?s)(?:<!-- START_FULLSTACK_AUDIT_RULE -->.*?<!-- END_FULLSTACK_AUDIT_RULE -->|<!-- START_FRONTEND_AUDIT_RULE -->.*?<!-- END_FRONTEND_AUDIT_RULE -->)"
 $legacyPattern = "(?s)##[ \t]*[^\r\n#]*?(?:Fullstack|Frontend) Architecture\s*&(?:amp;)?\s*Component Lookup[^\r\n]*.*?(?=(?:\r?\n---|\r?\n##\s+(?!Available Commands)[^\r\n]+)|\z)"
+
+$TargetsToUpdate = [System.Collections.Generic.List[string]]::new()
+if (Test-Path "AGENTS.md") { $TargetsToUpdate.Add("AGENTS.md") }
+if (Test-Path "CLAUDE.md") { $TargetsToUpdate.Add("CLAUDE.md") }
+
+# Only update GEMINI.md if it already explicitly contains the audit marker
+if (Test-Path "GEMINI.md") {
+    $fullGemini = (Resolve-Path "GEMINI.md").Path
+    $geminiContent = [System.IO.File]::ReadAllText($fullGemini, [System.Text.Encoding]::UTF8)
+    if ($geminiContent -match $markerPattern -or $geminiContent -match $legacyPattern) {
+        $TargetsToUpdate.Add("GEMINI.md")
+    }
+}
+
+if ($TargetsToUpdate.Count -eq 0 -and (-not (Test-Path "AGENTS.md"))) {
+    $TargetsToUpdate.Add("AGENTS.md")
+}
 
 foreach ($target in $TargetsToUpdate) {
     if (Test-Path $target) {
@@ -280,21 +288,21 @@ foreach ($target in $TargetsToUpdate) {
         if ($existing -match $markerPattern) {
             $updated = [System.Text.RegularExpressions.Regex]::Replace($existing, $markerPattern, [System.Text.RegularExpressions.MatchEvaluator]{ return $RuleBlock })
             [System.IO.File]::WriteAllText($fullPath, $updated, $utf8NoBom)
-            Write-Host "$emojiRefresh Cleanly updated Fullstack Architecture Rule in $target" -ForegroundColor Cyan
+            Write-Host "Cleanly updated Fullstack Architecture Rule in $target" -ForegroundColor Cyan
         } elseif ($existing -match $legacyPattern) {
             $updated = [System.Text.RegularExpressions.Regex]::Replace($existing, $legacyPattern, [System.Text.RegularExpressions.MatchEvaluator]{ return $RuleBlock })
             [System.IO.File]::WriteAllText($fullPath, $updated, $utf8NoBom)
-            Write-Host "$emojiRefresh Upgraded legacy Architecture Rule in-place in $target" -ForegroundColor Cyan
-        } else {
+            Write-Host "Upgraded legacy Architecture Rule in-place in $target" -ForegroundColor Cyan
+        } elseif ($target -ne "GEMINI.md") {
             $separator = if ($existing.EndsWith("`n")) { "`n" } else { "`n`n" }
             $updated = $existing + $separator + $RuleBlock + "`n"
             [System.IO.File]::WriteAllText($fullPath, $updated, $utf8NoBom)
-            Write-Host "$emojiLink Injected Fullstack Architecture Rule into $target" -ForegroundColor Cyan
+            Write-Host "Injected Fullstack Architecture Rule into $target" -ForegroundColor Cyan
         }
     } else {
         $initialContent = "# $target $emDash Workspace Guidelines for AI Assistants`n`n$RuleBlock`n"
         [System.IO.File]::WriteAllText((Join-Path (Get-Location) $target), $initialContent, $utf8NoBom)
-        Write-Host "$emojiDoc Created $target with 100% Always-Active Fullstack Atlas rule!" -ForegroundColor Cyan
+        Write-Host "Created $target with 100% Always-Active Fullstack Atlas rule!" -ForegroundColor Cyan
     }
 }
 

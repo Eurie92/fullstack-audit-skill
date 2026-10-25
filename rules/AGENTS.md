@@ -6,8 +6,9 @@ Universal execution rule across all harnesses (Antigravity, Cursor, Claude Code,
 ### The 4-Phase Operational Pipeline
 
 #### Phase 1: GPS / Locate (fullstack-audit Native MCP & Atlas)
-- **IRON GATE INVARIANT (Zero-Grep & Zero-Scratch Absolute Mandate)**:
-  - **FORBIDDEN (All Recursive Searches)**: NEVER run `Get-ChildItem -Recurse` (under ANY parameters: `-Filter`, `-Include`, `-Path`, `-Directory`, etc.), `grep -r`, `rg`, `find`, or `dir /s`. Windows PowerShell scans `node_modules` and `.next`, causing a 15–30s Defender freeze.
+- **IRON GATE INVARIANT (Zero-Grep & Zero-Scratch Absolute Mandate across ALL Tasks)**:
+  - **FORBIDDEN (All Recursive Searches)**: NEVER run `Get-ChildItem -Recurse` (under ANY parameters or subdirectories: 'app', 'components', 'src', -Filter, -Include, -Path), `Select-String`, `grep -r`, `rg`, `find`, or `dir /s`. Scoped subfolder recursive scans are EQUALLY BANNED. The Iron Gate Lifecycle Hook physically denies these calls.
+  - **FORBIDDEN (Refactoring & Import Grep)**: NEVER use recursive grep to find imports, functions, or dependencies during refactoring. Use `docs/backend-atlas/06_FULLSTACK_CROSS_REFERENCE_MAP.md` or `fullstack_path` (sub-5ms causal tracer).
   - **FORBIDDEN (Inline Scratch Scripts)**: NEVER execute `node -e "const fs = require('fs')..."`, `python -c "..."`, or PowerShell `[IO.File]::ReadAllText` / `ForEach-Object` one-liners to locate, read, or patch files.
   - **FORBIDDEN (Path Guessing)**: NEVER guess paths or prepend arbitrary prefixes like `src/components/`.
   - **MANDATORY GPS FIRST-ACTION**: The FIRST action MUST locate the element deterministically:

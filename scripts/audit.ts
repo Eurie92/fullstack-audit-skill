@@ -2530,7 +2530,7 @@ function discoverInstalledSkills(workspaceRoot: string = ROOT_DIR): DiscoveredSk
   return discovered;
 }
 
-// In-place, safe UTF-8 Rule Synchronizer for AGENTS.md / GEMINI.md / CLAUDE.md
+// In-place, safe UTF-8 Rule Synchronizer for AGENTS.md / CLAUDE.md
 function syncAgentRulesInPlace() {
   const ruleBlock = generateDynamicRuleBlock({
     profile: "triad",
@@ -2539,33 +2539,35 @@ function syncAgentRulesInPlace() {
     superpowers: true,
   });
 
-  const candidates = ["AGENTS.md", "GEMINI.md", "CLAUDE.md"];
-  const existingFiles = candidates.filter(f => fs.existsSync(f));
+  const markerPattern = /(?:<!-- START_FULLSTACK_AUDIT_RULE -->[\s\S]*?<!-- END_FULLSTACK_AUDIT_RULE -->|<!-- START_FRONTEND_AUDIT_RULE -->[\s\S]*?<!-- END_FRONTEND_AUDIT_RULE -->)/;
+  const legacyPattern = /##[ \t]*[^\r\n#]*?(?:Fullstack|Frontend) Architecture\s*&(?:amp;)?\s*Component Lookup[^\r\n]*[\s\S]*?(?=(?:\r?\n---|\r?\n##\s+(?:Available Commands)[^\r\n]+)|$)/;
 
-  if (existingFiles.length === 0) {
-    fs.writeFileSync("AGENTS.md", `# AGENTS.md — Workspace Guidelines for AI Assistants\n\n${ruleBlock}\n`, "utf8");
-    console.log(`📄 Created AGENTS.md with 100% Always-Active Fullstack Atlas rule!`);
-    return;
+  // Only target universal guideline files. GEMINI.md is excluded from auto-targeting
+  // because Antigravity loads fullstack-audit rules via the global plugin.
+  const candidates: string[] = [];
+  if (fs.existsSync("AGENTS.md")) candidates.push("AGENTS.md");
+  if (fs.existsSync("CLAUDE.md")) candidates.push("CLAUDE.md");
+
+  // Only consider GEMINI.md if it already explicitly contains the audit rule marker
+  if (fs.existsSync("GEMINI.md")) {
+    const geminiContent = fs.readFileSync("GEMINI.md", "utf8");
+    if (markerPattern.test(geminiContent) || legacyPattern.test(geminiContent)) {
+      candidates.push("GEMINI.md");
+    }
   }
 
-  const markerPattern = /(?:<!-- START_FULLSTACK_AUDIT_RULE -->[\s\S]*?<!-- END_FULLSTACK_AUDIT_RULE -->|<!-- START_FRONTEND_AUDIT_RULE -->[\s\S]*?<!-- END_FRONTEND_AUDIT_RULE -->)/;
-  const legacyPattern = /##[ \t]*[^\r\n#]*?(?:Fullstack|Frontend) Architecture\s*&(?:amp;)?\s*Component Lookup[^\r\n]*[\s\S]*?(?=(?:\r?\n---|\r?\n##\s+(?![🛠️\?]|Available Commands)[^\r\n]+)|$)/;
-
-  for (const targetFile of existingFiles) {
+  for (const targetFile of candidates) {
     let content = fs.readFileSync(targetFile, "utf8");
     if (markerPattern.test(content)) {
       content = content.replace(markerPattern, () => ruleBlock);
       fs.writeFileSync(targetFile, content, "utf8");
-      console.log(`🔄 Cleanly updated Fullstack Architecture Rule in ${targetFile}`);
+      console.log(`Cleanly updated Fullstack Architecture Rule in ${targetFile}`);
     } else if (legacyPattern.test(content)) {
       content = content.replace(legacyPattern, () => ruleBlock);
       fs.writeFileSync(targetFile, content, "utf8");
-      console.log(`🔄 Upgraded legacy Architecture Rule in-place in ${targetFile}`);
-    } else {
-      content = content.trimEnd() + "\n\n" + ruleBlock + "\n";
-      fs.writeFileSync(targetFile, content, "utf8");
-      console.log(`🔗 Injected Fullstack Architecture Rule into ${targetFile}`);
+      console.log(`Upgraded legacy Architecture Rule in-place in ${targetFile}`);
     }
+    // If no marker is present, do NOT append. Respect developer opt-out and clean file state.
   }
 }
 
@@ -4142,38 +4144,39 @@ export function generateDynamicRuleBlock(profileOpts: ProfileOptions = resolvePr
   lines.push("<!-- START_FRONTEND_AUDIT_RULE -->");
 
   if (isTriad) {
-    lines.push("## ⚡ Fullstack 4-Phase Synergy Engine (0ms Atlas • Ponytail KISS • Caveman Terse • Dual-Speed Verify)");
-    lines.push("Universal execution rule across all harnesses (**Antigravity, Cursor, Claude Code, Windsurf, Codex, OpenCode, VS Code**).");
+    lines.push("## Fullstack 4-Phase Synergy Engine (0ms Atlas • Ponytail KISS • Caveman Terse • Dual-Speed Verify)");
+    lines.push("Universal execution rule across all harnesses (Antigravity, Cursor, Claude Code, Windsurf, Codex, OpenCode, VS Code).");
     lines.push("");
-    lines.push("### 🔄 The 4-Phase Operational Pipeline");
+    lines.push("### The 4-Phase Operational Pipeline");
     lines.push("");
-    lines.push("#### Phase 1: GPS / Locate (`fullstack-audit`)");
+    lines.push("#### Phase 1: GPS / Locate (fullstack-audit)");
   } else if (isStandalone) {
-    lines.push("## 🗺️ Fullstack Atlas Engine (0ms Zero-Grep • Dual-Speed Verify)");
-    lines.push("Universal execution rule across all harnesses (**Antigravity, Cursor, Claude Code, Windsurf, Codex, OpenCode, VS Code**).");
+    lines.push("## Fullstack Atlas Engine (0ms Zero-Grep • Dual-Speed Verify)");
+    lines.push("Universal execution rule across all harnesses (Antigravity, Cursor, Claude Code, Windsurf, Codex, OpenCode, VS Code).");
     lines.push("");
-    lines.push("### 🔄 The Operational Protocol");
+    lines.push("### The Operational Protocol");
     lines.push("");
-    lines.push("#### 1. GPS / Locate (`fullstack-audit`)");
+    lines.push("#### 1. GPS / Locate (fullstack-audit)");
   } else {
     const activePillars: string[] = ["0ms Atlas"];
     if (ponytail) activePillars.push("Ponytail KISS");
     if (caveman) activePillars.push("Caveman Terse");
     if (superpowers) activePillars.push("Dual-Speed Verify");
-    lines.push(`## ⚡ Fullstack Modular Synergy Engine (${activePillars.join(" • ")})`);
-    lines.push("Universal execution rule across all harnesses (**Antigravity, Cursor, Claude Code, Windsurf, Codex, OpenCode, VS Code**).");
+    lines.push(`## Fullstack Modular Synergy Engine (${activePillars.join(" • ")})`);
+    lines.push("Universal execution rule across all harnesses (Antigravity, Cursor, Claude Code, Windsurf, Codex, OpenCode, VS Code).");
     lines.push("");
-    lines.push("### 🔄 The Operational Pipeline");
+    lines.push("### The Operational Pipeline");
     lines.push("");
-    lines.push("#### Phase 1: GPS / Locate (`fullstack-audit`)");
+    lines.push("#### Phase 1: GPS / Locate (fullstack-audit)");
   }
 
   // Phase 1 / GPS Content
-  lines.push("- 🛑 **IRON GATE INVARIANT (Zero-Grep & Zero-Scratch Absolute Mandate)**:");
-  lines.push("  - ❌ **FORBIDDEN (All Recursive Searches)**: NEVER run `Get-ChildItem -Recurse` (under ANY parameters: `-Filter`, `-Include`, `-Path`, `-Directory`, etc.), `grep -r`, `rg`, `find`, or `dir /s`. Windows PowerShell scans `node_modules` and `.next`, causing a 15–30s Defender freeze.");
-  lines.push("  - ❌ **FORBIDDEN (Inline Scratch Scripts)**: NEVER execute `node -e \"const fs = require('fs')...\"`, `python -c \"...\"`, or PowerShell `[IO.File]::ReadAllText` / `ForEach-Object` one-liners to locate, read, or patch files.");
-  lines.push("  - ❌ **FORBIDDEN (Path Guessing)**: NEVER guess paths or prepend arbitrary prefixes like `src/components/`.");
-  lines.push("  - ✅ **MANDATORY GPS FIRST-ACTION**: The FIRST action MUST locate the element deterministically:");
+  lines.push("- **IRON GATE INVARIANT (Zero-Grep & Zero-Scratch Absolute Mandate across ALL Tasks)**:");
+  lines.push("  - **FORBIDDEN (All Recursive Searches)**: NEVER run `Get-ChildItem -Recurse` (under ANY parameters or subdirectories: 'app', 'components', 'src', -Filter, -Include, -Path), `Select-String`, `grep -r`, `rg`, `find`, or `dir /s`. Scoped subfolder recursive scans are EQUALLY BANNED. The Iron Gate Lifecycle Hook physically denies these calls.");
+  lines.push("  - **FORBIDDEN (Refactoring & Import Grep)**: NEVER use recursive grep to find imports, functions, or dependencies during refactoring. Use `docs/backend-atlas/06_FULLSTACK_CROSS_REFERENCE_MAP.md` or `fullstack_path` (sub-5ms causal tracer).");
+  lines.push("  - **FORBIDDEN (Inline Scratch Scripts)**: NEVER execute `node -e \"const fs = require('fs')...\"`, `python -c \"...\"`, or PowerShell `[IO.File]::ReadAllText` / `ForEach-Object` one-liners to locate, read, or patch files.");
+  lines.push("  - **FORBIDDEN (Path Guessing)**: NEVER guess paths or prepend arbitrary prefixes like `src/components/`.");
+  lines.push("  - **MANDATORY GPS FIRST-ACTION**: The FIRST action MUST locate the element deterministically:");
   lines.push("    - **Native MCP Fast Find**: Call `fullstack_find(query: \"<query>\")` (sub-3ms token-compact lookup) or `node bin/audit.js --find \"<query>\" --compact`.");
   lines.push("    - **Native MCP Visual & Icon Locator**: Call `fullstack_locate_visual(query: \"<query>\")` (0ms lookup for live pulse dots `animate-pulse`, capsule pills `rounded-full`, badges, action icons).");
   lines.push("    - **Native MCP Fuzzy Case Resolver**: Call `fullstack_resolve(name: \"<name>\")` (prefix-agnostic casing & path resolver in 0ms).");
@@ -4182,15 +4185,15 @@ export function generateDynamicRuleBlock(profileOpts: ProfileOptions = resolvePr
   lines.push("    - **Native MCP Surgical Patcher**: Call `fullstack_patch(filePath: \"<file>\", target: \"<old>\", replacement: \"<new>\")` or `edit_file`.");
   lines.push("    - **Pre-Computed Atlases**: Direct `read_file` on `docs/frontend-atlas/` (01 routes, 02 components, 03 tokens, 06 visible text, 07 icons) or `docs/backend-atlas/` (01 APIs, 02 DB models, 03 server actions, 04 auth).");
   lines.push("- **Screenshot & Temp Image Armor**: When a user references a screenshot in `AppData\\Local\\Temp\\orca-paste-*.png`:");
-  lines.push("  - ❌ **FORBIDDEN**: Never call `read_file` or `view_file` directly on `AppData\\Local\\Temp` paths (avoids OS hook sandbox interception).");
-  lines.push("  - ⚡ **Fast-Path A (Visual Atlas)**: Query `fullstack_locate_visual(query: \"<element>\")` or view `docs/frontend-atlas/02_COMPONENT_INVENTORY.md` in 0ms without opening the image.");
-  lines.push("  - ⚡ **Fast-Path B (Scratch Copy)**: If the raw screenshot must be viewed, copy first: `Copy-Item '<temp-path>' 'scratch\\screenshot.png'`, then open `scratch\screenshot.png`.");
+  lines.push("  - **FORBIDDEN**: Never call `read_file` or `view_file` directly on `AppData\\Local\\Temp` paths (avoids OS hook sandbox interception).");
+  lines.push("  - **Fast-Path A (Visual Atlas)**: Query `fullstack_locate_visual(query: \"<element>\")` or view `docs/frontend-atlas/02_COMPONENT_INVENTORY.md` in 0ms without opening the image.");
+  lines.push("  - **Fast-Path B (Scratch Copy)**: If the raw screenshot must be viewed, copy first: `Copy-Item '<temp-path>' 'scratch\\screenshot.png'`, then open `scratch\screenshot.png`.");
   lines.push("- **PowerShell Quoting & Surgical Patching**:");
   lines.push("  - Wrap PowerShell arguments in single-quotes `'...'` (prevents `&` reserved character syntax crash and variable expansion).");
   lines.push("  - To edit code: Prefer native MCP `fullstack_patch` or harness `edit_file` (CRLF-agnostic surgical patcher).");
   lines.push("- **Immediate Relinquishment Invariant (Zero Over-Investigation Mandate)**:");
   lines.push("  - Once the target `file:line` is located (via `fullstack_find`, `fullstack_locate_visual`, or `06_VISIBLE_TEXT_AND_LABELS_MAP.md`), the agent MUST IMMEDIATELY output the target `file:line` receipt and STOP.");
-  lines.push("  - ❌ **FORBIDDEN**: NEVER continue reading parent wrappers, layouts, or route trees (`page.tsx`, `layout.tsx`) unless the user explicitly requested mount-point tracing.");
+  lines.push("  - **FORBIDDEN**: NEVER continue reading parent wrappers, layouts, or route trees (`page.tsx`, `layout.tsx`) unless the user explicitly requested mount-point tracing.");
   lines.push("  - For screenshot queries: Extract the visible text label or action icon in 1 read, query `fullstack_find(\"<label>\")`, return the exact `file:line`, and conclude.");
   lines.push("");
 
@@ -4926,18 +4929,16 @@ function executeUniversalSetup(opts: { cursor?: boolean; claude?: boolean; herme
     console.log("✅ Universal AGENTS.md: Cleanly synchronized with latest guidelines");
   }
 
-  // 6. GEMINI.md (Antigravity CLI / Gemini Code Assist standard)
+  // 6. GEMINI.md (Optional legacy update only; never auto-injected to avoid Antigravity token duplication)
   const geminiMdPath = path.join(ROOT_DIR, "GEMINI.md");
   if (fs.existsSync(geminiMdPath)) {
     let content = fs.readFileSync(geminiMdPath, "utf-8");
     const markerPattern = /(?:<!-- START_FULLSTACK_AUDIT_RULE -->[\s\S]*?<!-- END_FULLSTACK_AUDIT_RULE -->|<!-- START_FRONTEND_AUDIT_RULE -->[\s\S]*?<!-- END_FRONTEND_AUDIT_RULE -->)/;
     if (markerPattern.test(content)) {
       content = content.replace(markerPattern, () => ruleLines);
-    } else {
-      content = content + "\n\n" + ruleLines + "\n";
+      fs.writeFileSync(geminiMdPath, content, "utf-8");
+      console.log("GEMINI.md: Cleanly synchronized existing audit block");
     }
-    fs.writeFileSync(geminiMdPath, content, "utf-8");
-    console.log("✅ GEMINI.md: Cleanly synchronized with latest guidelines");
   }
 
   console.log("\n🎉 Multi-Harness Setup Complete! Your codebase is now 100% configured for Antigravity, Cursor, Claude Code, Hermes, and OpenCode.\n");

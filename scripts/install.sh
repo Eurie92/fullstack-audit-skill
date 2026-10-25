@@ -224,10 +224,16 @@ RULE_BLOCK+="
 
 TARGET_FILES=()
 [ -f "AGENTS.md" ] && TARGET_FILES+=("AGENTS.md")
-[ -f "GEMINI.md" ] && TARGET_FILES+=("GEMINI.md")
 [ -f "CLAUDE.md" ] && TARGET_FILES+=("CLAUDE.md")
 
-if [ ${#TARGET_FILES[@]} -eq 0 ]; then
+# Only update GEMINI.md if it already explicitly contains the audit marker
+if [ -f "GEMINI.md" ]; then
+    if grep -q "START_FULLSTACK_AUDIT_RULE\|START_FRONTEND_AUDIT_RULE" "GEMINI.md" 2>/dev/null; then
+        TARGET_FILES+=("GEMINI.md")
+    fi
+fi
+
+if [ ${#TARGET_FILES[@]} -eq 0 ] && [ ! -f "AGENTS.md" ]; then
     TARGET_FILES+=("AGENTS.md")
 fi
 
@@ -244,23 +250,25 @@ const legacyPattern = /##[ \t]*[^\r\n#]*?(?:Fullstack|Frontend) Architecture\s*&
 
 if (markerPattern.test(content)) {
     content = content.replace(markerPattern, () => newRule);
-    console.log(`🔄 Cleanly updated Fullstack Architecture Rule in ${target}`);
+    console.log(`Cleanly updated Fullstack Architecture Rule in ${target}`);
 } else if (legacyPattern.test(content)) {
     content = content.replace(legacyPattern, () => newRule);
-    console.log(`🔄 Upgraded legacy Architecture Rule in-place in ${target}`);
-} else {
+    console.log(`Upgraded legacy Architecture Rule in-place in ${target}`);
+} else if (target !== "GEMINI.md") {
     content = content.trimEnd() + "\n\n" + newRule + "\n";
-    console.log(`🔗 Injected Fullstack Architecture Rule into ${target}`);
+    console.log(`Injected Fullstack Architecture Rule into ${target}`);
 }
 fs.writeFileSync(target, content, "utf8");
 ' "$TARGET_FILE"
         else
-            echo -e "\n$RULE_BLOCK" >> "$TARGET_FILE"
-            echo "🔗 Injected Fullstack Architecture Rule into $TARGET_FILE"
+            if [ "$TARGET_FILE" != "GEMINI.md" ]; then
+                echo -e "\n$RULE_BLOCK" >> "$TARGET_FILE"
+                echo "Injected Fullstack Architecture Rule into $TARGET_FILE"
+            fi
         fi
     else
         echo -e "# $TARGET_FILE — Workspace Guidelines for AI Assistants\n\n$RULE_BLOCK\n" > "$TARGET_FILE"
-        echo "📄 Created $TARGET_FILE with 100% Always-Active Fullstack Atlas rule!"
+        echo "Created $TARGET_FILE with 100% Always-Active Fullstack Atlas rule!"
     fi
 done
 
