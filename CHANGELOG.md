@@ -8,11 +8,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [2.15.0] - 2026-10-26
 
-> **Release Tier**: `MINOR (Hardware Anti-Grep Lifecycle Hook & Zero-Forced Injection Engine)`  
-> **Summary**: Introduces native Antigravity PreToolUse Lifecycle Hook (`hooks.json` + `scripts/anti-grep-gate.js`) physically denying slow recursive commands (`Get-ChildItem -Recurse`, `Select-String`, `grep -r`, `rg`, `find`) before PowerShell spawns. Hardens prompt guidelines to close scoped-recursion and refactoring loopholes with 100% interception accuracy in 100-run empirical benchmarks. Completely eliminates forced rule injection into `GEMINI.md` across installers and self-updaters, respecting developer workspace clean state.
+> **Release Tier**: `MINOR (Hybrid Code RAG Engine, Dual-Framing MCP Daemon, Hardware Anti-Grep Hook & Multi-Harness Auto-Registration)`  
+> **Summary**: Introduces local, zero-dependency Hybrid Code RAG (`--rag`) combining Okapi BM25, camelCase/kebab-case sub-word tokenization, domain synonym expansion, and 1-hop causal bundle retrieval. Hardens the native MCP daemon with in-memory caching and Dual-Framing (HTTP Content-Length LSP headers + NDJSON) for seamless interoperability across Antigravity, Cursor, Claude Code, Windsurf, VS Code, Roo, and OpenCode. Features the Antigravity PreToolUse Iron Gate Hook (`hooks.json` + `bin/iron-gate-hook.js`) with 100% interception of recursive scans, automated multi-harness MCP configuration, and instant diagnostic commands (`--doctor`, `--roi`).
 
 ### Added
-* **Antigravity PreToolUse Iron Gate Hook (`hooks.json` & `scripts/anti-grep-gate.js`)**:
+* **Hybrid Code RAG Engine (`--rag <query>`, `scripts/audit.ts`, `bin/mcp-server.js`)**:
+  * Sub-word code tokenizer (`tokenizeCodeIdentifier` / `tokenizeCode`) splitting `useOrderHistory` into `["use", "order", "history"]`.
+  * Domain synonym expansion table (`FULLSTACK_SYNONYMS`) bridging user intents like `"login"` ➔ `["signin", "auth", "session", "oauth"]`, `"buy"` ➔ `["cart", "checkout", "order", "purchase"]`.
+  * Weighted field boosting (UI buttons x2.5, routes x2.0, APIs x2.0, database models x1.8) ensuring precise top-k ranking in under 1.5ms without external Python, Torch, or embedding dependencies.
+  * 1-Hop causal bundle integration enriching route hits with direct trigger-action-model dependencies.
+* **Dual-Framing LSP MCP Daemon (`bin/mcp-server.js`, `scripts/mcp-server.ts`)**:
+  * Universal protocol framing supporting both LSP header streaming (`Content-Length: <n>\r\n\r\n`) and standard newline-delimited JSON (NDJSON).
+  * In-memory stat-based cache (`getCachedAtlasIndex`) eliminating redundant disk reads on burst agent lookups.
+  * In-memory file resolution for `fullstack_resolve` in <0.5ms via cached index files.
+* **Developer Experience & Diagnostic Tools (`--doctor`, `--roi`)**:
+  * `npx fullstack-audit --doctor`: One-shot automated health check testing Node.js version, index integrity, MCP server responsiveness, iron gate hook status, and active IDE harness configurations.
+  * `npx fullstack-audit --roi`: Live ROI dashboard card calculating tokens saved, dollar cost savings across LLMs, and cumulative AMSI Defender lag prevented.
+* **Universal 10-Harness Auto-Registration (`--setup-all`)**:
+  * Automatically registers Fullstack Audit MCP daemon into `.cursor/mcp.json`, `.mcp.json` (Claude Code), `.vscode/mcp.json`, `.windsurf/mcp.json`, `.roo/mcp.json`, and `opencode.json`.
+* **Antigravity PreToolUse Iron Gate Hook (`hooks.json` & `bin/iron-gate-hook.js`)**:
   * Native lifecycle hook intercepting `run_command` before terminal process instantiation.
   * Achieved 100.0% interception rate (50/50) against all variations of recursive searches (`Get-ChildItem 'app' -Recurse`, `Select-String`, `grep -rn`, `rg`, `findstr /s`).
   * 0.0% false positive rate on legitimate developer commands (`git`, `npm`, `tsc`, `audit`).
@@ -25,8 +39,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   * Explicitly prohibits scoped recursive directory scans (`Get-ChildItem 'app' -Recurse`, `components`, `src`).
   * Broadens ban across ALL tasks (refactoring, import dependency tracking, bug investigations).
   * Directs AI agents to `docs/backend-atlas/06_FULLSTACK_CROSS_REFERENCE_MAP.md` and `fullstack_path` for import tracing.
+* **Decoupled Universal Examples (`rules/AGENTS.md`, `scripts/install.ps1`, `scripts/install.sh`)**:
+  * Replaced project-specific example references (`xnight`) with universal standard (`brand-logo`).
 
 ### Fixed
+* **TDZ ReferenceError in `scripts/audit.ts`**:
+  * Relocated helper functions `executeMultiAgentPartition`, `auditGlobalStylesheets`, and `escapeRegexForCodemod` below `TYPOGRAPHY_REGEX` and `APPROVED_HEXES`, eliminating fatal ES module hoisting crashes.
+* **String Replacement Dollar-Sign (`$`) Substitution Corruption**:
+  * Replaced vulnerable `.replace(target, replacement)` in `executeSurgicalPatch` and `toolSurgicalPatch` with `.replace(target, () => replacement)` to prevent unintended regex backreference substitutions (`$1`, `$&`, `$$`).
+* **Path Traversal Vulnerability in Patch API**:
+  * Added path normalization and directory boundary validation (`!fullPath.startsWith(resolvedRoot)`) in both CLI and MCP patchers.
+* **Dynamic RegExp Injection Protection in Backend Scanner (`scripts/audit-backend.ts`)**:
+  * Escaped user-supplied and schema model identifiers before passing into dynamic `new RegExp()` constructors.
 * **Zero-Forced Rule Injection (`scripts/audit.ts`, `scripts/install.ps1`, `scripts/install.sh`)**:
   * Removed `GEMINI.md` from default auto-injection candidates.
   * Eliminated forced `else` rule append fallback in `syncAgentRulesInPlace` and `executeUniversalSetup`.

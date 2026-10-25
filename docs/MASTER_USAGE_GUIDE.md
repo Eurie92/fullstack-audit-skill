@@ -211,7 +211,10 @@ Spawn 4 subagents in parallel to execute edits across their respective zones wit
 | I want to... | Use this Command or File |
 | :--- | :--- |
 | **Audit whole project** | `npx fullstack-audit` or `npm run audit` |
-| **Configure multi-harness profiles** | `npx fullstack-audit --setup-all [--standalone \| --profile <profile>]` |
+| **Hybrid Code RAG retrieval (BM25 + Synonyms)** | `npx fullstack-audit --rag "<query>"` |
+| **Environment & Harness Health Check** | `npx fullstack-audit --doctor` |
+| **Token & AMSI Defender ROI Report** | `npx fullstack-audit --roi` |
+| **Configure multi-harness profiles & MCPs** | `npx fullstack-audit --setup-all [--standalone \| --profile <profile>]` |
 | **Locate a UI element by text** | Read `docs/frontend-atlas/06_VISIBLE_TEXT_AND_LABELS_MAP.md` |
 | **Locate an action icon** | Read `docs/frontend-atlas/07_VISUAL_AND_ICON_INDEX.md` |
 | **Resolve component name & casing in 0ms** | `npx fullstack-audit --resolve <name>` |

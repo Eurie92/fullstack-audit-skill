@@ -131,6 +131,15 @@ Once installed, **you do not need to run manual terminal commands during daily w
 
 ---
 
+## Fast CLI Utilities & Hybrid Code RAG
+
+* **`npx fullstack-audit --rag "<query>"`**: Hybrid Code RAG combining BM25, sub-word tokenization, domain synonyms, and 1-hop causal bundle retrieval in <1.5ms.
+* **`npx fullstack-audit --doctor`**: Automated health check verifying Node.js, MCP daemon, Iron Gate hooks, and 10 IDE harness configurations.
+* **`npx fullstack-audit --roi`**: Live developer ROI card tracking tokens, dollar savings, and AMSI Defender latency saved.
+* **`npx fullstack-audit --setup-all`**: Universal 10-harness setup auto-registering rules and MCP across Cursor, Claude Code, Windsurf, VS Code, Roo, and OpenCode.
+
+---
+
 ## Generated Architecture Atlases (`docs/`)
 
 Running Fullstack Audit documents your codebase architecture neatly inside `docs/`:

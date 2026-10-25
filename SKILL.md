@@ -119,7 +119,7 @@ Works seamlessly across **Antigravity, Cursor, Claude Code, Windsurf, Codex, and
 12. **`12_TEST_SUITES_AND_COVERAGE_MAP.md`**: Pre-indexed registry of unit, integration, and E2E test suites. Eliminates blind directory greps on test assertion failures.
 13. **`THEME_MIGRATION_PUNCHLIST.md`**: Actionable `- [ ]` checklist for whole-website color and dark mode migrations.
 
-## Available Commands (v2.13.0 Multi-Harness & Native MCP Engine)
+## Available Commands (v2.15.0 Multi-Harness & Native MCP Engine)
 - **Native MCP Tools (Zero Latency, In-Memory)**:
   - `fullstack_find`: Sub-3ms instant inverted index search across components, queries, test assertions, and database models.
   - `fullstack_locate_visual`: 0ms visual element locator (pulse dots, capsule pills, status badges, icons).
@@ -130,9 +130,13 @@ Works seamlessly across **Antigravity, Cursor, Claude Code, Windsurf, Codex, and
   - `fullstack_audit`: Runs or refreshes the fullstack atlas catalog in the active project.
 - **CLI Commands (Terminal & Scripts)**:
   - `/fullstack-audit` or `npm run audit`: Regenerates the entire Fullstack Atlas and root `llms.txt` / `llms-full.txt`.
+  - `npx fullstack-audit --find "<query>" --compact`: Fast-path index query for AI agents (<1ms).
+  - `npx fullstack-audit --rag "<query>"`: Hybrid Code RAG retrieval (BM25 + Semantic Vector + 1-Hop Causal Bundle).
+  - `npx fullstack-audit --doctor`: Health check for Node, MCP server, Iron Gate hooks, and 10 IDE harnesses.
+  - `npx fullstack-audit --roi`: Live developer benchmark card showing exact tokens, dollars, and AMSI latency saved.
   - `npx fullstack-audit --version` or `-v`: Instant (<5ms) version banner and engine output.
-- `npx fullstack-audit --check-update`: Compares project Atlas against installed skill version and detects version drift.
-- `npx fullstack-audit --setup-all [--standalone | --profile <profile>]`: Universal multi-harness auto-installer (configures Cursor `.cursor/rules/*.mdc`, Claude Code `.claude/commands/`, Hermes Agent `skills/`, OpenCode, and `AGENTS.md` / `GEMINI.md`).
+  - `npx fullstack-audit --check-update`: Compares project Atlas against installed skill version and detects version drift.
+  - `npx fullstack-audit --setup-all [--standalone | --profile <profile>]`: Universal 10-harness auto-installer (configures Cursor, Claude Code, VS Code Copilot, Windsurf, Cline/Roo, OpenCode, Hermes, Aider, and Codex with rules & native MCP auto-registration).
 - `npx fullstack-audit --find <query> [--compact]`: Sub-3ms instant inverted index search across components, queries, test assertions, and database models.
 - `npx fullstack-audit --locate-visual <query>`: 0ms visual element locator (pulse dots, capsule pills, status badges, icons).
 - `npx fullstack-audit --resolve <name>`: Fuzzy case-insensitive component & file resolver (e.g. `connect-modal` ➔ `ConnectModal.tsx`).

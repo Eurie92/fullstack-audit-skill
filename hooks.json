@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node scripts/anti-grep-gate.js",
+            "command": "node bin/iron-gate-hook.js",
             "timeout": 5
           }
         ]

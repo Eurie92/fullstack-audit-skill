@@ -13,8 +13,8 @@ import { fileURLToPath } from "url";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-let FULLSTACK_AUDIT_VERSION = "2.13.0";
-let FULLSTACK_AUDIT_ENGINE = "Living Fullstack Atlas & Minimalist Engine v2.13.0";
+let FULLSTACK_AUDIT_VERSION = "2.15.0";
+let FULLSTACK_AUDIT_ENGINE = "Living Fullstack Atlas & Minimalist Engine v2.15.0";
 try {
   const pkgPath = path.resolve(__dirname, "../package.json");
   if (fs.existsSync(pkgPath)) {
@@ -68,6 +68,74 @@ class FastLRUCache {
 const findLruCache = new FastLRUCache(256);
 const visualLruCache = new FastLRUCache(256);
 const pathLruCache = new FastLRUCache(256);
+
+// In-Memory Cached Atlas Store to eliminate disk I/O on query bursts
+const indexFileCache = new Map();
+
+function getCachedAtlasIndex(indexPath) {
+  try {
+    if (!fs.existsSync(indexPath)) return null;
+    const stat = fs.statSync(indexPath);
+    const cached = indexFileCache.get(indexPath);
+    if (cached && cached.mtime === stat.mtimeMs) {
+      return cached;
+    }
+    const raw = fs.readFileSync(indexPath, "utf-8");
+    const data = JSON.parse(raw);
+    const files = Array.isArray(data.files) ? data.files : [];
+    const entry = { mtime: stat.mtimeMs, data, files };
+    indexFileCache.set(indexPath, entry);
+    return entry;
+  } catch {
+    return null;
+  }
+}
+
+function tokenizeCode(input) {
+  if (!input) return [];
+  return input
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .replace(/([A-Z]+)([A-Z][a-z])/g, "$1 $2")
+    .replace(/[-_./\\:()[\]{}'"`]/g, " ")
+    .toLowerCase()
+    .split(/\s+/)
+    .filter(t => t.length > 1);
+}
+
+const MCP_SYNONYMS = {
+  login: ["signin", "auth", "session", "user"],
+  signin: ["login", "auth", "session"],
+  auth: ["login", "signin", "session", "guard", "middleware", "token"],
+  checkout: ["payment", "stripe", "cart", "order", "purchase", "billing", "subscription"],
+  payment: ["checkout", "stripe", "invoice", "billing"],
+  modal: ["dialog", "drawer", "sheet", "overlay", "popup"],
+  dialog: ["modal", "drawer", "sheet", "overlay"],
+  drawer: ["modal", "sheet", "dock", "overlay"],
+  pill: ["badge", "chip", "tag", "capsule"],
+  badge: ["pill", "chip", "tag", "status"],
+  dot: ["pulse", "status", "indicator", "pip"],
+  pulse: ["dot", "live", "animate-pulse"],
+  table: ["model", "schema", "entity", "database", "prisma", "drizzle"],
+  model: ["table", "schema", "entity", "prisma", "drizzle"],
+  api: ["route", "endpoint", "handler", "action", "server"],
+  action: ["server-action", "mutation", "handler", "api"],
+  button: ["btn", "trigger", "cta"],
+};
+
+function expandCodeSynonyms(tokens) {
+  const expanded = new Set(tokens);
+  for (const token of tokens) {
+    const syns = MCP_SYNONYMS[token];
+    if (syns) {
+      for (const s of syns) expanded.add(s);
+    }
+  }
+  return Array.from(expanded);
+}
+
+function escapeRegex(str) {
+  return (str || "").replace(/[-\/\\^$*+?.()|[\]{}]/g, "\\$&");
+}
 
 export function ensureGitignoreProtection(projectRoot) {
   try {
@@ -149,8 +217,9 @@ function toolFind(query, projectRoot, compact = true) {
   }
 
   const indexPath = path.join(root, "docs", "frontend-atlas", ".atlas-index.json");
+  const cachedIndex = getCachedAtlasIndex(indexPath);
 
-  if (!fs.existsSync(indexPath)) {
+  if (!cachedIndex || !cachedIndex.data) {
     return {
       content: `❌ [Atlas Not Found] docs/frontend-atlas/.atlas-index.json is missing in ${root}.\nTip: Call the "fullstack_audit" tool to generate the fullstack atlas for this project.`,
       isError: false,
@@ -158,10 +227,11 @@ function toolFind(query, projectRoot, compact = true) {
   }
 
   try {
-    const raw = fs.readFileSync(indexPath, "utf-8");
-    const index = JSON.parse(raw);
-
+    const index = cachedIndex.data;
     const qNorm = q.replace(/[.,:;!?'"`\-_/\\()]/g, "").trim();
+    const qTokens = tokenizeCode(query);
+    const expandedTokens = expandCodeSynonyms(qTokens);
+
     const hits = [];
     (index.entries || []).forEach((entry) => {
       const sym = (entry.symbol || "").toLowerCase();
@@ -169,16 +239,35 @@ function toolFind(query, projectRoot, compact = true) {
       const file = (entry.file || "").toLowerCase();
       const meta = (entry.meta || "").toLowerCase();
 
+      let score = 0;
       if (sym === q || (qNorm && symNorm === qNorm)) {
-        hits.push({ entry, score: 100 });
+        score = 100;
       } else if (sym.startsWith(q) || (qNorm && symNorm.startsWith(qNorm))) {
-        hits.push({ entry, score: 85 });
+        score = 85;
       } else if (sym.includes(q) || (qNorm && symNorm.includes(qNorm))) {
-        hits.push({ entry, score: 70 });
+        score = 70;
       } else if (qNorm && qNorm.length >= 3 && symNorm.includes(qNorm)) {
-        hits.push({ entry, score: 60 });
+        score = 60;
       } else if (file.includes(q) || meta.includes(q)) {
-        hits.push({ entry, score: 25 });
+        score = 30;
+      }
+
+      if (qTokens.length > 0) {
+        const entryTokens = tokenizeCode(`${entry.symbol} ${entry.meta || ""} ${entry.file}`);
+        let matchedTokens = 0;
+        for (const token of expandedTokens) {
+          if (entryTokens.includes(token)) matchedTokens++;
+        }
+        if (matchedTokens > 0) {
+          const hybridScore = Math.min(85, Math.round((matchedTokens / Math.max(qTokens.length, 1)) * 80));
+          if (hybridScore > score) score = hybridScore;
+        }
+      }
+
+      if (score > 0) {
+        if (entry.category === "route" || entry.category === "component") score += 5;
+        if (entry.category === "action" || entry.category === "api") score += 4;
+        hits.push({ entry, score });
       }
     });
 
@@ -224,8 +313,9 @@ function toolLocateVisual(query, projectRoot) {
   }
 
   const indexPath = path.join(root, "docs", "frontend-atlas", ".atlas-index.json");
+  const cachedIndex = getCachedAtlasIndex(indexPath);
 
-  if (!fs.existsSync(indexPath)) {
+  if (!cachedIndex || !cachedIndex.data) {
     return {
       content: `❌ [Atlas Not Found] docs/frontend-atlas/.atlas-index.json is missing in ${root}. Run "fullstack_audit" first.`,
       isError: false,
@@ -233,8 +323,7 @@ function toolLocateVisual(query, projectRoot) {
   }
 
   try {
-    const raw = fs.readFileSync(indexPath, "utf-8");
-    const index = JSON.parse(raw);
+    const index = cachedIndex.data;
 
     const visualCategories = new Set(["live-dot", "capsule-pill", "icon", "label", "overlay"]);
     const hits = [];
@@ -295,8 +384,14 @@ function toolResolve(name, projectRoot) {
   const baseOnlyQuery = path.basename(normalizedQuery);
   const cleanQ = baseOnlyQuery.toLowerCase().replace(/[-_.]/g, "").replace(/\.(tsx|jsx|ts|js|vue|svelte|astro|css)$/, "");
 
-  const allFiles = [];
-  getFilesRecursively(root, allFiles);
+  const indexPath = path.join(root, "docs", "frontend-atlas", ".atlas-index.json");
+  const cachedIndex = getCachedAtlasIndex(indexPath);
+  let allFiles = [];
+  if (cachedIndex && cachedIndex.files && cachedIndex.files.length > 0) {
+    allFiles = cachedIndex.files.map(f => path.resolve(root, f));
+  } else {
+    getFilesRecursively(root, allFiles);
+  }
 
   const matches = [];
 
@@ -463,11 +558,34 @@ function toolSymbolSlices(symbolName, projectRoot) {
   const root = resolveProjectRoot(projectRoot);
   if (!symbolName) return { content: "❌ Symbol parameter cannot be empty.", isError: true };
 
-  const allFiles = [];
-  getFilesRecursively(root, allFiles);
-  const targetFiles = allFiles.filter(f => /\.(ts|tsx|js|jsx)$/.test(f));
-
   const q = symbolName.toLowerCase().trim();
+  const indexPath = path.join(root, "docs", "frontend-atlas", ".atlas-index.json");
+  const cachedIndex = getCachedAtlasIndex(indexPath);
+
+  // Fast-Path: In-memory pre-indexed slices and symbols (<0.1ms)
+  if (cachedIndex && cachedIndex.data && Array.isArray(cachedIndex.data.entries)) {
+    const preHits = cachedIndex.data.entries.filter(e => 
+      (e.category === "slice" || e.category === "symbol" || e.category === "action") &&
+      (e.symbol.toLowerCase().includes(q) || (e.meta && e.meta.toLowerCase().includes(q)))
+    );
+    if (preHits.length > 0) {
+      const out = [`⚡ [GOD-FILE SLICER: Sub-1ms Index Hit] Found ${preHits.length} slice(s) matching "${symbolName}":\n`];
+      preHits.forEach(h => {
+        out.push(`   - ${h.file}:${h.line} [${h.meta || h.category}] -> ${h.symbol}`);
+      });
+      out.push(`\n💡 Target lines above with read_file(StartLine, EndLine) for sub-second precision.`);
+      return { content: out.join("\n"), isError: false };
+    }
+  }
+
+  let allFiles = [];
+  if (cachedIndex && cachedIndex.files && cachedIndex.files.length > 0) {
+    allFiles = cachedIndex.files.map(f => path.resolve(root, f));
+  } else {
+    getFilesRecursively(root, allFiles);
+  }
+  const targetFiles = allFiles.filter(f => /\.(ts|tsx|js|jsx)$/.test(f));
+  const escapedSym = escapeRegex(symbolName);
   const hits = [];
 
   for (const f of targetFiles) {
@@ -485,7 +603,7 @@ function toolSymbolSlices(symbolName, projectRoot) {
 
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
-      const declRegex = new RegExp(`(?:async\\s+)?(?:function\\s+)?([a-zA-Z0-9_$]*${symbolName}[a-zA-Z0-9_$]*)\\s*(?:=|\\()`, "i");
+      const declRegex = new RegExp(`(?:async\\s+)?(?:function\\s+)?([a-zA-Z0-9_$]*${escapedSym}[a-zA-Z0-9_$]*)\\s*(?:=|\\()`, "i");
       const match = line.match(declRegex);
       if (match) {
         const foundSym = match[1];
@@ -544,7 +662,11 @@ function toolSurgicalPatch(filePath, target, replacement, projectRoot) {
   if (!filePath) return { content: "❌ Target filePath is required.", isError: true };
   if (target === undefined || replacement === undefined) return { content: "❌ Both target and replacement strings are required.", isError: true };
 
-  const fullPath = path.isAbsolute(filePath) ? filePath : path.join(root, filePath);
+  const resolvedRoot = path.resolve(root);
+  const fullPath = path.isAbsolute(filePath) ? path.resolve(filePath) : path.resolve(root, filePath);
+  if (!fullPath.startsWith(resolvedRoot)) {
+    return { content: `❌ Security Error: Path traversal forbidden. Path outside workspace root: ${filePath}`, isError: true };
+  }
   if (!fs.existsSync(fullPath)) {
     return { content: `❌ Target file not found: ${filePath}`, isError: true };
   }
@@ -595,7 +717,7 @@ function toolSurgicalPatch(filePath, target, replacement, projectRoot) {
     };
   }
 
-  let updatedContent = normalizedFile.replace(normalizedTarget, normalizedReplace);
+  let updatedContent = normalizedFile.replace(normalizedTarget, () => normalizedReplace);
   if (isCrlf) updatedContent = updatedContent.replace(/\n/g, "\r\n");
   fs.writeFileSync(fullPath, updatedContent, "utf-8");
 
@@ -735,6 +857,8 @@ export function startMcpServer() {
   logDebug(`Initializing Fullstack Audit MCP Server daemon v${FULLSTACK_AUDIT_VERSION}...`);
   ensureGitignoreProtection(process.cwd());
 
+  let clientUsesHeaders = false;
+
   const rl = readline.createInterface({
     input: process.stdin,
     output: process.stdout,
@@ -742,18 +866,34 @@ export function startMcpServer() {
   });
 
   const sendResponse = (id, result) => {
-    const msg = JSON.stringify({ jsonrpc: "2.0", id, result });
-    process.stdout.write(msg + "\n");
+    const payload = JSON.stringify({ jsonrpc: "2.0", id, result });
+    if (clientUsesHeaders) {
+      const len = Buffer.byteLength(payload, "utf-8");
+      process.stdout.write(`Content-Length: ${len}\r\n\r\n${payload}`);
+    } else {
+      process.stdout.write(payload + "\n");
+    }
   };
 
   const sendError = (id, code, message, data) => {
-    const msg = JSON.stringify({ jsonrpc: "2.0", id, error: { code, message, data } });
-    process.stdout.write(msg + "\n");
+    const payload = JSON.stringify({ jsonrpc: "2.0", id, error: { code, message, data } });
+    if (clientUsesHeaders) {
+      const len = Buffer.byteLength(payload, "utf-8");
+      process.stdout.write(`Content-Length: ${len}\r\n\r\n${payload}`);
+    } else {
+      process.stdout.write(payload + "\n");
+    }
   };
 
   rl.on("line", (line) => {
     const trimmed = line.trim();
     if (!trimmed) return;
+
+    // Handle LSP / Header-framed clients (VS Code, Windsurf, Claude Desktop)
+    if (trimmed.startsWith("Content-Length:") || trimmed.startsWith("Content-Type:")) {
+      clientUsesHeaders = true;
+      return;
+    }
 
     try {
       const request = JSON.parse(trimmed);
@@ -836,6 +976,7 @@ export function startMcpServer() {
       }
     } catch (err) {
       logDebug(`Parse error on line: ${err.message}`);
+      sendError(null, -32700, "Parse error");
     }
   });
 

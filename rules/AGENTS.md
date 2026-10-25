@@ -28,7 +28,7 @@ Universal execution rule across all harnesses (Antigravity, Cursor, Claude Code,
   - When running terminal commands, wrap PowerShell arguments in single-quotes `'...'` (prevents `&` reserved character syntax crash and variable expansion).
   - To edit code: Prefer `edit_file` or `fullstack_patch` native tool (CRLF-agnostic surgical patcher).
 - **ONE-AND-DONE HARD STOP (Anti-Overinvestigation & Zero Double-Checking Mandate)**:
-  - The moment ANY tool call, search hit, or atlas lookup reveals the matching `file:line` (e.g. `public-navbar.tsx:149` for "xnight"):
+  - The moment ANY tool call, search hit, or atlas lookup reveals the matching `file:line` (e.g. `public-navbar.tsx:149` for "brand-logo"):
     - **IMMEDIATELY STOP ALL FURTHER TOOL CALLS.** Do not make another read, search, or check.
     - **FORBIDDEN (Sister-File Double-Checking)**: NEVER inspect related, sibling, or drawer components (e.g. `mobile-nav-drawer.tsx`, `header.tsx`, `footer.tsx`, `sidebar.tsx`) to "double check" or "be thorough" unless the user explicitly used the word "ALL" (e.g. "find ALL occurrences").
     - **FORBIDDEN (End-of-File Crawling)**: NEVER read further down or read to the end of the file once the target snippet is identified.
@@ -72,7 +72,7 @@ Universal execution rule across all harnesses (Antigravity, Cursor, Claude Code,
   - **Zero Polling Invariant**: Do NOT loop on `manage_task status`. The harness features Reactive Wakeup and automatically resumes execution when tasks complete.
   - Run `fullstack_audit` or `npm run audit` upon milestone completion to synchronize atlases.
 
-### Available MCP Tools & CLI Commands (v2.14.0 Multi-Harness Engine)
+### Available MCP Tools & CLI Commands (v2.15.0 Multi-Harness Engine)
 - **Native MCP Tools**:
   - `fullstack_find`: Sub-3ms token-compact lookup for symbols, components, routes, queries, APIs.
   - `fullstack_locate_visual`: 0ms visual element locator (pulse dots, capsule pills, status badges, icons).
@@ -84,6 +84,9 @@ Universal execution rule across all harnesses (Antigravity, Cursor, Claude Code,
 - **CLI Commands**:
   - `/fullstack-audit` or `npm run audit`: Regenerates the entire Fullstack Atlas and root `llms.txt` / `llms-full.txt`.
   - `node bin/audit.js --find <query> --compact`: Ultra-fast query mode for AI agents.
+  - `node bin/audit.js --rag <query>`: Hybrid Code RAG retrieval (BM25 + semantic vector + 1-hop causal bundle).
+  - `node bin/audit.js --doctor`: Health check for Node, MCP server, hooks, and IDE harnesses.
+  - `node bin/audit.js --roi`: Live developer benchmark card showing tokens, dollars, and AMSI latency saved.
   - `node bin/audit.js --theme --route <route> --compact`: Generates a route-scoped micro-punchlist.
   - `node bin/audit.js --verify --gate-clean`: Smart multi-target verification gate.
 <!-- END_FRONTEND_AUDIT_RULE -->

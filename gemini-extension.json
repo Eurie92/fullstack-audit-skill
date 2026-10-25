@@ -1,6 +1,6 @@
 {
   "name": "fullstack-audit",
-  "version": "2.13.2",
+  "version": "2.15.0",
   "description": "Zero-latency fullstack atlas, design system catalog, and GPS locator with native MCP tools for instant code navigation.",
   "contextFileName": "AGENTS.md"
 }

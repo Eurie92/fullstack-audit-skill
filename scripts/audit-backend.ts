@@ -3,7 +3,7 @@ import path from "path";
 import { FULLSTACK_AUDIT_VERSION, FULLSTACK_AUDIT_ENGINE, getAtlasProvenanceHeader, AtlasIndexEntry } from "./constants.js";
 
 /**
- * Universal Backend Atlas & Full-Stack Audit Engine (v2.10.0)
+ * Universal Backend Atlas & Full-Stack Audit Engine (v2.15.0)
  * 
  * Generates docs/backend-atlas/:
  * 1. 01_API_ROUTES_AND_ENDPOINTS.md (Next.js App/Pages Router API, Express, Hono, Remix)
@@ -14,6 +14,10 @@ import { FULLSTACK_AUDIT_VERSION, FULLSTACK_AUDIT_ENGINE, getAtlasProvenanceHead
  * 6. 06_FULLSTACK_CROSS_REFERENCE_MAP.md (Bi-directional UI Trigger ➔ Backend Action / API ➔ Database Model)
  * 7. 07_ENV_AND_SECRETS_MAP.md (Client Secret Leak Radar & Undocumented Shadow Variables)
  */
+
+function escapeRegex(str: string): string {
+  return (str || "").replace(/[-\/\\^$*+?.()|[\]{}]/g, "\\$&");
+}
 
 const ROOT_DIR = process.cwd();
 const BACKEND_OUTPUT_DIR = path.join(ROOT_DIR, "docs", "backend-atlas");
@@ -970,7 +974,8 @@ export function buildFullstackBridge(
     }
 
     services.forEach(svc => {
-      const methodRegex = new RegExp(`\\b${svc}\\.([a-zA-Z0-9_]+)\\s*\\(`, "g");
+      const escapedSvc = escapeRegex(svc);
+      const methodRegex = new RegExp(`\\b${escapedSvc}\\.([a-zA-Z0-9_]+)\\s*\\(`, "g");
       let mm;
       let hadMethod = false;
       while ((mm = methodRegex.exec(content)) !== null) {
@@ -979,7 +984,7 @@ export function buildFullstackBridge(
         if (!serviceCalls.includes(callSig)) serviceCalls.push(callSig);
       }
       if (!hadMethod) {
-        const directRegex = new RegExp(`\\b${svc}\\s*\\(`, "g");
+        const directRegex = new RegExp(`\\b${escapedSvc}\\s*\\(`, "g");
         if (directRegex.test(content)) {
           const callSig = `${svc}()`;
           if (!serviceCalls.includes(callSig)) serviceCalls.push(callSig);
@@ -1049,7 +1054,7 @@ export function buildFullstackBridge(
 
           connectedModels = models
             .filter(m => {
-              const nameRegex = new RegExp(`\\b${m.name}\\b|\\b${m.tableName}\\b`, "i");
+              const nameRegex = new RegExp(`\\b${escapeRegex(m.name)}\\b|\\b${escapeRegex(m.tableName)}\\b`, "i");
               return matchingEndpoint.filePath.toLowerCase().includes(m.name.toLowerCase()) || nameRegex.test(combinedContent);
             })
             .map(m => m.name);
@@ -1071,7 +1076,7 @@ export function buildFullstackBridge(
 
       // Check Server Action calls
       actions.forEach(action => {
-        const actionCallRegex = new RegExp(`\\b${action.name}\\s*\\(`);
+        const actionCallRegex = new RegExp(`\\b${escapeRegex(action.name)}\\s*\\(`);
         if (actionCallRegex.test(trimmed) && relPath !== action.relativePath) {
           const actionFull = path.resolve(rootDir, action.filePath);
           const actionContent = getFileContentCached(actionFull);
@@ -1080,7 +1085,7 @@ export function buildFullstackBridge(
 
           const connectedModels = models
             .filter(m => {
-              const nameRegex = new RegExp(`\\b${m.name}\\b|\\b${m.tableName}\\b`, "i");
+              const nameRegex = new RegExp(`\\b${escapeRegex(m.name)}\\b|\\b${escapeRegex(m.tableName)}\\b`, "i");
               return nameRegex.test(combinedAction);
             })
             .map(m => m.name)

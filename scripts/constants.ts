@@ -67,6 +67,54 @@ export interface AtlasIndex {
   engine: string;
   generatedAt: string;
   totalEntries: number;
+  files?: string[];
   entries: AtlasIndexEntry[];
   causalGraph?: CausalGraph;
+}
+
+// Zero-Dependency Sub-Word Tokenizer for Code & Architecture Identifiers
+export function tokenizeCodeIdentifier(input: string): string[] {
+  if (!input) return [];
+  return input
+    // Split camelCase & PascalCase
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    // Split acronyms like HTMLParser -> HTML Parser
+    .replace(/([A-Z]+)([A-Z][a-z])/g, "$1 $2")
+    // Split punctuation and path separators
+    .replace(/[-_./\\:()[\]{}'"`]/g, " ")
+    .toLowerCase()
+    .split(/\s+/)
+    .filter(t => t.length > 1);
+}
+
+// Fullstack Concept & Synonym Map (0ms In-Memory Concept Expansion)
+export const FULLSTACK_SYNONYMS: Record<string, string[]> = {
+  "login": ["signin", "auth", "session", "user"],
+  "signin": ["login", "auth", "session"],
+  "auth": ["login", "signin", "session", "guard", "middleware", "token"],
+  "checkout": ["payment", "stripe", "cart", "order", "purchase", "billing", "subscription"],
+  "payment": ["checkout", "stripe", "invoice", "billing"],
+  "modal": ["dialog", "drawer", "sheet", "overlay", "popup"],
+  "dialog": ["modal", "drawer", "sheet", "overlay"],
+  "drawer": ["modal", "sheet", "dock", "overlay"],
+  "pill": ["badge", "chip", "tag", "capsule"],
+  "badge": ["pill", "chip", "tag", "status"],
+  "dot": ["pulse", "status", "indicator", "pip"],
+  "pulse": ["dot", "live", "animate-pulse"],
+  "table": ["model", "schema", "entity", "database", "prisma", "drizzle"],
+  "model": ["table", "schema", "entity", "prisma", "drizzle"],
+  "api": ["route", "endpoint", "handler", "action", "server"],
+  "action": ["server-action", "mutation", "handler", "api"],
+  "button": ["btn", "trigger", "cta"],
+};
+
+export function expandSynonyms(tokens: string[]): string[] {
+  const expanded = new Set<string>(tokens);
+  for (const token of tokens) {
+    const syns = FULLSTACK_SYNONYMS[token];
+    if (syns) {
+      for (const s of syns) expanded.add(s);
+    }
+  }
+  return Array.from(expanded);
 }

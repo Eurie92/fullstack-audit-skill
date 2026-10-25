@@ -44,6 +44,11 @@ if (tsxPath) {
   });
 }
 
+child.on("error", (err) => {
+  console.error("❌ Failed to spawn fullstack-audit process:", err.message);
+  process.exit(1);
+});
+
 child.on("exit", (code) => {
   process.exit(code ?? 0);
 });

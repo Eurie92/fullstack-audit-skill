@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 
 /**
- * Iron Gate Anti-Grep PreToolUse Lifecycle Hook
- * Intercepts and denies slow recursive directory scans (Get-ChildItem -Recurse, grep -r, find, Select-String)
+ * Iron Gate Anti-Grep PreToolUse Lifecycle Hook (v2.15.0)
+ * Intercepts and denies slow recursive directory scans (Get-ChildItem -Recurse, grep -r, find, Select-String, git grep)
  * preventing 15-30s Windows Defender / AMSI freezes and context bloat.
+ * Compatible with Google Antigravity, Gemini CLI, and Claude Code PreToolUse hooks.
  */
 
 import fs from "fs";
@@ -30,9 +31,12 @@ function run() {
     return;
   }
 
+  // Handle Antigravity/Gemini ({ toolCall: { args: { CommandLine: "..." } } })
+  // and Claude Code ({ tool_name: "Bash", tool_input: { command: "..." } })
   const toolCall = payload.toolCall || {};
-  const args = toolCall.args || {};
+  const args = toolCall.args || payload.tool_input || {};
   const cmd = args.CommandLine || args.command || args.cmd || "";
+  const isClaudeCode = Boolean(payload.tool_name);
 
   if (!cmd || typeof cmd !== "string") {
     console.log(JSON.stringify({ decision: "allow" }));
@@ -41,8 +45,8 @@ function run() {
 
   const forbiddenRules = [
     {
-      regex: /(?:Get-ChildItem|gci|dir|ls)\s+[^|\n\r]*(?:[-/]Recurse|[-/]s\b)/i,
-      desc: "Get-ChildItem -Recurse / dir /s recursive file scan",
+      regex: /(?:Get-ChildItem|gci|dir|ls)\s+[^|\n\r]*(?:[-/]Recurse|[-/]s\b|-[a-zA-Z]*r\b)/i,
+      desc: "Get-ChildItem -Recurse / dir /s / gci -r recursive file scan",
     },
     {
       regex: /Select-String\s+[^|\n\r]*-(?:Path|Include)\s+[^|\n\r]*\*/i,
@@ -58,8 +62,12 @@ function run() {
       desc: "grep -r recursive search",
     },
     {
-      regex: /\b(?:rg|ripgrep)\b/i,
-      desc: "ripgrep global search",
+      regex: /\bgit\s+grep\b/i,
+      desc: "git grep recursive repository search",
+    },
+    {
+      regex: /\b(?:rg|ripgrep)\s+-[a-zA-Z]*[rR]|\b(?:rg|ripgrep)\s+["'][^"']+["']\s*$/i,
+      desc: "ripgrep global un-scoped search",
     },
     {
       regex: /\bfind\s+(?:\.|\/|[a-zA-Z0-9_\-'"\\]+)\s+-[a-zA-Z]*name/i,
@@ -74,8 +82,12 @@ function run() {
       desc: "node -e inline directory scanner",
     },
     {
-      regex: /(?:\[IO\.File\]::ReadAllText|\[System\.IO\.File\]::ReadAllText)/i,
-      desc: "PowerShell [IO.File] batch reading script",
+      regex: /python(?:\.exe)?\s+-c\s+.*os\.walk/i,
+      desc: "python inline recursive directory scanner",
+    },
+    {
+      regex: /\[(?:System\.)?IO\.(?:Directory|File)\]::(?:GetFiles|EnumerateFiles|ReadAllText)/i,
+      desc: "PowerShell [IO.Directory/File] batch reading script",
     },
   ];
 
@@ -95,6 +107,11 @@ function run() {
         "- God-File Slicer: fullstack_symbol(symbol: \"<method>\")",
         "- Pre-Computed Atlases: View docs/frontend-atlas/ or docs/backend-atlas/"
       ].join("\n");
+
+      if (isClaudeCode) {
+        process.stderr.write(reason + "\n");
+        process.exit(2);
+      }
 
       console.log(JSON.stringify({
         decision: "deny",

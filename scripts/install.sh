@@ -199,9 +199,12 @@ else
 fi
 
 RULE_BLOCK+="
-### Available Commands (v2.14.0 Multi-Harness Engine)
+### Available Commands (v2.15.0 Multi-Harness Engine)
 - \`/fullstack-audit\` or \`npm run audit\`: Regenerates the entire Fullstack Atlas and root \`docs/llms.txt\` / \`docs/llms-full.txt\`.
 - \`npx fullstack-audit --find <query> --compact\`: Ultra-fast, sub-3ms token-compact query mode for AI agents.
+- \`npx fullstack-audit --rag <query>\`: Hybrid Code RAG retrieval (BM25 + semantic vector + 1-hop causal bundle).
+- \`npx fullstack-audit --doctor\`: Health check for Node, MCP server, hooks, and 10 IDE harnesses.
+- \`npx fullstack-audit --roi\`: Live developer benchmark card showing exact tokens, dollars, and AMSI latency saved.
 - \`npx fullstack-audit --locate-visual <query>\`: 0ms visual element locator (pulse dots, capsule pills, status badges, icons).
 - \`npx fullstack-audit --resolve <name>\`: Fuzzy case-insensitive component & file resolver.
 - \`npx fullstack-audit --path <from> <to>\`: Sub-5ms causal execution path finder (UI button -> Action -> DB model).

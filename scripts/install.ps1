@@ -133,7 +133,7 @@ $RuleParts.Add(@'
   - Wrap PowerShell arguments in single-quotes `'...'` (prevents `&` reserved character syntax crash and variable expansion).
   - To edit code: Use native harness tools (`edit_file`) or `npx fullstack-audit --patch <file> --target "<old>" --replace "<new>"` (CRLF-agnostic surgical patcher).
 - **ONE-AND-DONE HARD STOP (Anti-Overinvestigation & Zero Double-Checking Mandate)**:
-  - The moment ANY tool call, search hit, or atlas lookup reveals the matching `file:line` (e.g. `public-navbar.tsx:149` for "xnight"):
+  - The moment ANY tool call, search hit, or atlas lookup reveals the matching `file:line` (e.g. `public-navbar.tsx:149` for "brand-logo"):
     - **IMMEDIATELY STOP ALL FURTHER TOOL CALLS.** Do not make another read, search, or check.
     - **FORBIDDEN (Sister-File Double-Checking)**: NEVER inspect related, sibling, or drawer components (e.g. `mobile-nav-drawer.tsx`, `header.tsx`, `footer.tsx`, `sidebar.tsx`) to "double check" or "be thorough" unless the user explicitly used the word "ALL" (e.g. "find ALL occurrences").
     - **FORBIDDEN (End-of-File Crawling)**: NEVER read further down or read to the end of the file once the target snippet is identified.
@@ -233,9 +233,12 @@ if ($enableSuper) {
 
 # Available Commands Block
 $RuleParts.Add(@'
-### Available Commands (v2.14.0 Multi-Harness Engine)
+### Available Commands (v2.15.0 Multi-Harness Engine)
 - `/fullstack-audit` or `npm run audit`: Regenerates the entire Fullstack Atlas and root `docs/llms.txt` / `docs/llms-full.txt`.
 - `npx fullstack-audit --find <query> --compact`: Ultra-fast, sub-3ms token-compact query mode for AI agents.
+- `npx fullstack-audit --rag <query>`: Hybrid Code RAG retrieval (BM25 + semantic vector + 1-hop causal bundle).
+- `npx fullstack-audit --doctor`: Health check for Node, MCP server, hooks, and 10 IDE harnesses.
+- `npx fullstack-audit --roi`: Live developer benchmark card showing exact tokens, dollars, and AMSI latency saved.
 - `npx fullstack-audit --locate-visual <query>`: 0ms visual element locator (pulse dots, capsule pills, status badges, icons).
 - `npx fullstack-audit --resolve <name>`: Fuzzy case-insensitive component & file resolver.
 - `npx fullstack-audit --path <from> <to>`: Sub-5ms causal execution path finder (UI button -> Action -> DB model).
