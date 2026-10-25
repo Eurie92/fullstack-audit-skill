@@ -6,6 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [2.14.1] - 2026-10-25
+
+> **Release Tier**: `PATCH (Automated Dev-to-Plugin Synchronization & Consumer Context Compaction)`  
+> **Summary**: Introduces an automated dev-to-plugin mirroring script (`npm run sync:plugin`) to keep active harness plugins instantly in sync with development commits in zero friction. Cleans up redundant fullstack audit instruction blocks from consumer SaaS projects where the global plugin is active, recovering 3,000+ prompt tokens per invocation turn.
+
+### Added
+* **Dev-to-Plugin Sync Script (`scripts/sync-plugin.ps1`)**:
+  * Added `npm run sync:plugin` to automatically synchronize `bin/`, `scripts/`, `rules/`, and package manifests directly to the global Antigravity plugin directory (`~/.gemini/config/plugins/fullstack-audit/`).
+
+---
+
 ## [2.14.0] - 2026-10-25
 
 > **Release Tier**: `MINOR (LRU Cache, Causal Graph, Multiline Screenshot-to-Code & Bootstrap Quarantine)`  
