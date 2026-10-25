@@ -4236,7 +4236,7 @@ export function generateDynamicRuleBlock(profileOpts: ProfileOptions = resolvePr
   // Phase 4: Verification / Superpowers or Native Dual-Speed
   if (superpowers) {
     lines.push(`#### Phase ${currentPhase}: Right-Sized Verification (\`superpowers\` Dual-Speed Harmonization)`);
-    lines.push("- **⚡ Inner-Loop (Fast Mode — 1 to 2s responses — Mandatory for UI/CSS/Layout/Copy edits ≤ 2 files, < 30 lines)**:");
+    lines.push("- **Inner-Loop (Fast Mode — 1 to 2s responses — Mandatory for UI/CSS/Layout/Copy edits <= 2 files, < 30 lines)**:");
     lines.push("  - Perform direct surgical file edits (`npx fullstack-audit --patch` or `edit_file`). Let local dev server (Next.js/Vite/Nuxt HMR) refresh in 50ms.");
     lines.push("  - **HARD FORBIDDEN**: Do NOT run full TypeScript compilation (`tsc --noEmit`, `npm run typecheck`).");
     lines.push("  - **HARD FORBIDDEN**: Do NOT run `npm run audit` or `npx fullstack-audit` on micro-edits.");
@@ -4244,7 +4244,7 @@ export function generateDynamicRuleBlock(profileOpts: ProfileOptions = resolvePr
     lines.push("  - **HARD FORBIDDEN**: Do NOT invoke multiple design skills in parallel.");
     lines.push("  - **HARD FORBIDDEN**: Do NOT invoke heavy browser automation (Chrome DevTools MCP / Puppeteer) or curl localhost.");
     lines.push("  - **Response Time**: Return immediately to the user in 1–2 seconds.");
-    lines.push("- **🛡️ Outer-Loop (Checkpoint Verification Gate — Milestones/Backend/DB/Auth)**:");
+    lines.push("- **Outer-Loop (Checkpoint Verification Gate — Milestones/Backend/DB/Auth)**:");
     lines.push("  - Superpowers Iron Law applies: *No completion claims without fresh verification evidence.*");
     lines.push("  - Run `npx fullstack-audit --verify --gate-clean` or test suites (`npm test`, `npm run typecheck`).");
     lines.push("  - Claim completion ONLY with fresh exit code 0 evidence.");
@@ -4253,17 +4253,17 @@ export function generateDynamicRuleBlock(profileOpts: ProfileOptions = resolvePr
   } else {
     const phaseLabel = isStandalone ? `${currentPhase}. Dual-Speed Verification Loop` : `Phase ${currentPhase}: Dual-Speed Verification Loop`;
     lines.push(`#### ${phaseLabel}`);
-    lines.push("- **⚡ Inner-Loop (Fast Mode — 1 to 2s responses for edits ≤ 2 files, < 30 lines)**:");
+    lines.push("- **Inner-Loop (Fast Mode — 1 to 2s responses for edits <= 2 files, < 30 lines)**:");
     lines.push("  - Perform direct surgical file edits (`npx fullstack-audit --patch` or `edit_file`). Let local dev server (Next.js/Vite/Nuxt HMR) refresh in 50ms.");
     lines.push("  - Do NOT run full TypeScript compilation (`tsc --noEmit`) or heavy browser MCPs on micro-edits.");
-    lines.push("- **🛡️ Outer-Loop (Checkpoint Verification Gate — Milestones/Backend/DB/Auth)**:");
+    lines.push("- **Outer-Loop (Checkpoint Verification Gate — Milestones/Backend/DB/Auth)**:");
     lines.push("  - Run verification gates (`npm test`, `npm run typecheck`, or `npx fullstack-audit --verify --gate-clean`) before milestone commits.");
     lines.push("  - **Zero Polling Invariant**: Do NOT loop on `manage_task status`. The harness features Reactive Wakeup and automatically resumes execution when tasks complete.");
     lines.push("  - Run `npm run audit` upon milestone completion to synchronize atlases.");
   }
   lines.push("");
 
-  lines.push(`### 🛠️ Available MCP Tools & CLI Commands (v${FULLSTACK_AUDIT_VERSION} Engine)`);
+  lines.push(`### Available MCP Tools & CLI Commands (v${FULLSTACK_AUDIT_VERSION} Engine)`);
   lines.push("- **Native MCP Tools**: `fullstack_find`, `fullstack_locate_visual`, `fullstack_resolve`, `fullstack_path`, `fullstack_symbol`, `fullstack_patch`, `fullstack_audit`");
   lines.push("- `/fullstack-audit` or `npm run audit`: Regenerates the entire Fullstack Atlas and root `llms.txt` / `llms-full.txt`.");
   lines.push("- `npx fullstack-audit --find <query> --compact`: Ultra-fast, sub-3ms token-compact query mode for AI agents.");

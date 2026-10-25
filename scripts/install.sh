@@ -75,36 +75,36 @@ RULE_BLOCK='<!-- START_FULLSTACK_AUDIT_RULE -->
 
 if [ "$ENABLE_PONYTAIL" -eq 1 ] && [ "$ENABLE_CAVEMAN" -eq 1 ] && [ "$ENABLE_SUPER" -eq 1 ]; then
     RULE_BLOCK+='
-## ⚡ Fullstack 4-Phase Synergy Engine (0ms Atlas • Ponytail KISS • Caveman Terse • Dual-Speed Verify)
+## Fullstack 4-Phase Synergy Engine (0ms Atlas • Ponytail KISS • Caveman Terse • Dual-Speed Verify)
 Universal execution rule across all harnesses (**Antigravity, Cursor, Claude Code, Windsurf, Codex, OpenCode, VS Code**).
 
-### 🔄 The 4-Phase Operational Pipeline
+### The 4-Phase Operational Pipeline
 
 #### Phase 1: GPS / Locate (`fullstack-audit`)'
 elif [ "$ENABLE_PONYTAIL" -eq 0 ] && [ "$ENABLE_CAVEMAN" -eq 0 ] && [ "$ENABLE_SUPER" -eq 0 ]; then
     RULE_BLOCK+='
-## 🗺️ Fullstack Atlas Engine (0ms Zero-Grep • Dual-Speed Verify)
+## Fullstack Atlas Engine (0ms Zero-Grep • Dual-Speed Verify)
 Universal execution rule across all harnesses (**Antigravity, Cursor, Claude Code, Windsurf, Codex, OpenCode, VS Code**).
 
-### 🔄 The Operational Protocol
+### The Operational Protocol
 
 #### 1. GPS / Locate (`fullstack-audit`)'
 else
     RULE_BLOCK+='
-## ⚡ Fullstack Modular Synergy Engine (0ms Atlas • Modular Engine)
+## Fullstack Modular Synergy Engine (0ms Atlas • Modular Engine)
 Universal execution rule across all harnesses (**Antigravity, Cursor, Claude Code, Windsurf, Codex, OpenCode, VS Code**).
 
-### 🔄 The Operational Pipeline
+### The 4-Phase Operational Pipeline
 
 #### Phase 1: GPS / Locate (`fullstack-audit`)'
 fi
 
 RULE_BLOCK+='
-- 🛑 **IRON GATE INVARIANT (Zero-Grep & Zero-Scratch Absolute Mandate)**:
-  - ❌ **FORBIDDEN (All Recursive Searches)**: NEVER run `Get-ChildItem -Recurse` (under ANY parameters: `-Filter`, `-Include`, `-Path`, `-Directory`, etc.), `grep -r`, `rg`, `find`, or `dir /s`. Windows PowerShell scans `node_modules` and `.next`, causing a 15–30s Defender freeze.
-  - ❌ **FORBIDDEN (Inline Scratch Scripts)**: NEVER execute `node -e "const fs = require('fs')..."`, `python -c "..."`, or PowerShell `[IO.File]::ReadAllText` / `ForEach-Object` one-liners to locate, read, or patch files.
-  - ❌ **FORBIDDEN (Path Guessing)**: NEVER guess paths or prepend arbitrary prefixes like `src/components/`.
-  - ✅ **MANDATORY GPS FIRST-ACTION**: The FIRST tool call MUST locate the element deterministically:
+- **IRON GATE INVARIANT (Zero-Grep & Zero-Scratch Absolute Mandate)**:
+  - **FORBIDDEN (All Recursive Searches)**: NEVER run `Get-ChildItem -Recurse` (under ANY parameters: `-Filter`, `-Include`, `-Path`, `-Directory`, etc.), `grep -r`, `rg`, `find`, or `dir /s`. Windows PowerShell scans `node_modules` and `.next`, causing a 15–30s Defender freeze.
+  - **FORBIDDEN (Inline Scratch Scripts)**: NEVER execute `node -e "const fs = require('fs')..."`, `python -c "..."`, or PowerShell `[IO.File]::ReadAllText` / `ForEach-Object` one-liners to locate, read, or patch files.
+  - **FORBIDDEN (Path Guessing)**: NEVER guess paths or prepend arbitrary prefixes like `src/components/`.
+  - **MANDATORY GPS FIRST-ACTION**: The FIRST tool call MUST locate the element deterministically:
     - **Fast Find**: Run `npx fullstack-audit --find "<query>" --compact` (sub-3ms token-compact lookup).
     - **Visual & Icon Locator**: Run `npx fullstack-audit --locate-visual "<query>"` (0ms lookup for live pulse dots `animate-pulse`, capsule pills `rounded-full`, badges, action icons).
     - **Fuzzy Case Resolver**: Run `npx fullstack-audit --resolve "<name>"` (prefix-agnostic casing & path resolver in 0ms).
@@ -112,9 +112,9 @@ RULE_BLOCK+='
     - **God-File Slicer**: Run `npx fullstack-audit --symbol "<method>"` (exact start/end lines before calling `read_file`).
     - **Pre-Computed Atlases**: Direct `view_file` on `docs/frontend-atlas/` (01 routes, 02 components, 03 tokens, 06 visible text, 07 icons) or `docs/backend-atlas/` (01 APIs, 02 DB models, 03 server actions, 04 auth).
 - **Screenshot & Temp Image Armor**: When a user references a screenshot in `AppData\Local\Temp\orca-paste-*.png`:
-  - ❌ **FORBIDDEN**: Never call `read_file` or `view_file` directly on `AppData\Local\Temp` paths (avoids OS hook sandbox interception).
-  - ⚡ **Fast-Path A (Visual Atlas)**: Query `npx fullstack-audit --locate-visual "<element>"` or view `docs/frontend-atlas/02_COMPONENT_INVENTORY.md` in 0ms without opening the image.
-  - ⚡ **Fast-Path B (Scratch Copy)**: If the raw screenshot must be viewed, copy first: `Copy-Item '<temp-path>' 'scratch\screenshot.png'`, then open `scratch\screenshot.png`.
+  - **FORBIDDEN**: Never call `read_file` or `view_file` directly on `AppData\Local\Temp` paths (avoids OS hook sandbox interception).
+  - **Fast-Path A (Visual Atlas)**: Query `npx fullstack-audit --locate-visual "<element>"` or view `docs/frontend-atlas/02_COMPONENT_INVENTORY.md` in 0ms without opening the image.
+  - **Fast-Path B (Scratch Copy)**: If the raw screenshot must be viewed, copy first: `Copy-Item '<temp-path>' 'scratch\screenshot.png'`, then open `scratch\screenshot.png`.
 - **PowerShell Quoting & Surgical Patching**:
   - Wrap PowerShell arguments in single-quotes '\''...'\''.
   - To edit code: Use native harness tools (`edit_file`) or `npx fullstack-audit --patch <file> --target "<old>" --replace "<new>"` (CRLF-agnostic surgical patcher).
@@ -164,7 +164,7 @@ fi
 if [ "$ENABLE_SUPER" -eq 1 ]; then
     RULE_BLOCK+="
 #### Phase $CURR_PHASE: Right-Sized Verification (\`superpowers\` Dual-Speed Harmonization)
-- **⚡ Inner-Loop (Fast Mode — 1 to 2s responses — Mandatory for UI/CSS/Layout/Copy edits ≤ 2 files, < 30 lines)**:
+- **Inner-Loop (Fast Mode — 1 to 2s responses — Mandatory for UI/CSS/Layout/Copy edits <= 2 files, < 30 lines)**:
   - Perform direct surgical file edits (\`npx fullstack-audit --patch\` or \`edit_file\`). Let local dev server (Next.js/Vite/Nuxt HMR) refresh in 50ms.
   - **HARD FORBIDDEN**: Do NOT run full TypeScript compilation (\`tsc --noEmit\`, \`npm run typecheck\`).
   - **HARD FORBIDDEN**: Do NOT run \`npm run audit\` or \`npx fullstack-audit\` on micro-edits.
@@ -172,7 +172,7 @@ if [ "$ENABLE_SUPER" -eq 1 ]; then
   - **HARD FORBIDDEN**: Do NOT invoke multiple design skills in parallel.
   - **HARD FORBIDDEN**: Do NOT invoke heavy browser automation (Chrome DevTools MCP / Puppeteer) or curl localhost.
   - **Response Time**: Return immediately to the user in 1–2 seconds.
-- **🛡️ Outer-Loop (Checkpoint Verification Gate — Milestones/Backend/DB/Auth)**:
+- **Outer-Loop (Checkpoint Verification Gate — Milestones/Backend/DB/Auth)**:
   - Superpowers Iron Law applies: *No completion claims without fresh verification evidence.*
   - Run \`npx fullstack-audit --verify --gate-clean\` or test suites (\`npm test\`, \`npm run typecheck\`).
   - Claim completion ONLY with fresh exit code 0 evidence.
@@ -188,10 +188,10 @@ else
 #### Phase $CURR_PHASE: Dual-Speed Verification Loop"
     fi
     RULE_BLOCK+="
-- **⚡ Inner-Loop (Fast Mode — 1 to 2s responses for edits ≤ 2 files, < 30 lines)**:
+- **Inner-Loop (Fast Mode — 1 to 2s responses for edits <= 2 files, < 30 lines)**:
   - Perform direct surgical file edits (\`npx fullstack-audit --patch\` or \`edit_file\`). Let local dev server (Next.js/Vite/Nuxt HMR) refresh in 50ms.
   - Do NOT run full TypeScript compilation (\`tsc --noEmit\`) or heavy browser MCPs on micro-edits.
-- **🛡️ Outer-Loop (Checkpoint Verification Gate — Milestones/Backend/DB/Auth)**:
+- **Outer-Loop (Checkpoint Verification Gate — Milestones/Backend/DB/Auth)**:
   - Run verification gates (\`npm test\`, \`npm run typecheck\`, or \`npx fullstack-audit --verify --gate-clean\`) before milestone commits.
   - **Zero Polling Invariant**: Do NOT loop on \`manage_task status\`. The harness features Reactive Wakeup and automatically resumes execution when tasks complete.
   - Run \`npm run audit\` upon milestone completion to synchronize atlases.
@@ -199,8 +199,8 @@ else
 fi
 
 RULE_BLOCK+="
-### 🛠️ Available Commands (v2.12.3 Multi-Harness Engine)
-- \`/fullstack-audit\` or \`npm run audit\`: Regenerates the entire Fullstack Atlas and root \`llms.txt\` / \`llms-full.txt\`.
+### Available Commands (v2.14.0 Multi-Harness Engine)
+- \`/fullstack-audit\` or \`npm run audit\`: Regenerates the entire Fullstack Atlas and root \`docs/llms.txt\` / \`docs/llms-full.txt\`.
 - \`npx fullstack-audit --find <query> --compact\`: Ultra-fast, sub-3ms token-compact query mode for AI agents.
 - \`npx fullstack-audit --locate-visual <query>\`: 0ms visual element locator (pulse dots, capsule pills, status badges, icons).
 - \`npx fullstack-audit --resolve <name>\`: Fuzzy case-insensitive component & file resolver.
@@ -212,7 +212,7 @@ RULE_BLOCK+="
 - \`npx fullstack-audit --verify --gate-clean [--route <route>]\`: Smart multi-target verification gate.
 - \`npx fullstack-audit --solo\`: Enforces strictly Single-Agent execution (no subagents).
 - \`npx fullstack-audit --multi-agent\`: Partitions codebase into 4 parallel zone briefs for rapid Map-Reduce sweeps.
-- \`npx fullstack-audit --llms\`: Generates root \`llms.txt\` and \`llms-full.txt\` (Answer.AI specification).
+- \`npx fullstack-audit --llms\`: Generates \`docs/llms.txt\` and \`docs/llms-full.txt\` (Answer.AI specification).
 - \`npx fullstack-audit --graph\`: Exports knowledge graph to \`docs/graph.json\` (NetworkX / Graphify schema).
 - \`npx fullstack-audit --diff\`: Architecture delta report comparing current scan against \`.last_receipt.json\`.
 - \`npx fullstack-audit --migrate-theme --from \"#hex1,#hex2\" --to \"dark:bg-slate-900\"\`: CRLF-agnostic AST codemod in 80ms (0 LLM output tokens).
