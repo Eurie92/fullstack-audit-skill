@@ -28,3 +28,5 @@ scratch/
 docs/llms.txt
 docs/llms-full.txt
 docs/THEME_MIGRATION_PUNCHLIST.md
+RELEASE_NOTES_*.md
+release-notes-*.md
