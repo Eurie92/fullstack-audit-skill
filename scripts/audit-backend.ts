@@ -1582,14 +1582,63 @@ export function writeBackendAtlas(result: BackendAuditResult, rootDir: string = 
     });
   });
 
+  const nodeMap = new Map<string, { id: string; label: string; type: string }>();
+  const links: { source: string; target: string; type: string }[] = [];
+
+  const addNode = (id: string, label: string, type: string) => {
+    if (!id || id === "-") return;
+    if (!nodeMap.has(id)) {
+      nodeMap.set(id, { id, label, type });
+    }
+  };
+
+  result.bridgeItems.forEach(b => {
+    const uiName = path.basename(b.frontendFile).replace(/\.[^/.]+$/, "");
+    addNode(uiName, uiName, "component");
+    addNode(b.backendTarget, b.backendTarget, b.targetType === "Server Action" ? "server_action" : "api_endpoint");
+    links.push({ source: uiName, target: b.backendTarget, type: "calls" });
+
+    (b.serviceCalls || []).forEach(s => {
+      addNode(s, s, "service");
+      links.push({ source: b.backendTarget, target: s, type: "delegates" });
+    });
+
+    (b.connectedModels || []).forEach(m => {
+      addNode(m, m, "db_model");
+      links.push({ source: b.backendTarget, target: m, type: "mutates" });
+    });
+
+    if (b.externalService) {
+      addNode(b.externalService, b.externalService, "integration");
+      links.push({ source: b.backendTarget, target: b.externalService, type: "uses" });
+    }
+  });
+
+  const causalGraph = {
+    nodes: Array.from(nodeMap.values()),
+    links,
+  };
+
   const backendIndex = {
     version: FULLSTACK_AUDIT_VERSION,
     engine: FULLSTACK_AUDIT_ENGINE,
     generatedAt: new Date().toISOString(),
     totalEntries: backendEntries.length,
     entries: backendEntries,
+    causalGraph,
   };
   fs.writeFileSync(path.join(outputDir, ".backend-index.json"), JSON.stringify(backendIndex, null, 2), "utf-8");
+
+  const fIndexCandidate1 = path.join(path.dirname(outputDir), "frontend-atlas", ".atlas-index.json");
+  const fIndexCandidate2 = path.join(rootDir, "docs", "frontend-atlas", ".atlas-index.json");
+  const frontendIndexPath = fs.existsSync(fIndexCandidate1) ? fIndexCandidate1 : (fs.existsSync(fIndexCandidate2) ? fIndexCandidate2 : null);
+  if (frontendIndexPath) {
+    try {
+      const fIndex = JSON.parse(fs.readFileSync(frontendIndexPath, "utf-8"));
+      fIndex.causalGraph = causalGraph;
+      fs.writeFileSync(frontendIndexPath, JSON.stringify(fIndex, null, 2), "utf-8");
+    } catch {}
+  }
 
   console.log(`✨ Backend Atlas written to: ${path.relative(rootDir, outputDir)}`);
 }

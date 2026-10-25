@@ -19,7 +19,9 @@ import { fileURLToPath } from "url";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const XNIGHT_ROOT = "C:\\Users\\EURIE\\Dev\\SaaS\\xnight";
+const XNIGHT_ROOT = fs.existsSync(path.join(process.cwd(), "docs", "frontend-atlas")) 
+  ? process.cwd() 
+  : "C:\\Users\\EURIE\\Dev\\SaaS\\xnight";
 const ATLAS_INDEX_PATH = path.join(XNIGHT_ROOT, "docs", "frontend-atlas", ".atlas-index.json");
 const BACKEND_API_PATH = path.join(XNIGHT_ROOT, "docs", "backend-atlas", "01_API_ROUTES_AND_ENDPOINTS.md");
 const BACKEND_SCHEMA_PATH = path.join(XNIGHT_ROOT, "docs", "backend-atlas", "02_DATABASE_MODELS_AND_SCHEMA.md");

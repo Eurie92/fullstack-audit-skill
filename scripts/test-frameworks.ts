@@ -7,6 +7,7 @@
 import fs from "fs";
 import path from "path";
 import child_process from "child_process";
+import { ensureGitignoreProtection } from "./mcp-server.js";
 
 const TEST_DIR = path.join(process.cwd(), ".tmp-test-frameworks");
 
@@ -716,6 +717,30 @@ async function runTestMatrix() {
     assert(fs.existsSync(path.join(batch4AppDir, ".cursor", "rules", "fullstack-audit.mdc")), ".cursor/rules/fullstack-audit.mdc generated");
     assert(fs.existsSync(path.join(batch4AppDir, "CLAUDE.md")), "CLAUDE.md generated");
     assert(fs.existsSync(path.join(batch4AppDir, "skills", "audit", "fullstack-audit", "SKILL.md")), "Hermes Agent SKILL.md generated");
+
+    // ============================================================
+    // Test 13: LRU Cache, Causal Graph & Bootstrap Quarantine (v2.14.0)
+    // ============================================================
+    console.log("\n▶️ Test 13: LRU Cache, Causal Graph & Bootstrap Quarantine (v2.14.0)");
+
+    // 1. Verify bootstrap .gitignore quarantine
+    const dummyAppDir = path.join(TEST_DIR, "quarantine-app");
+    fs.mkdirSync(dummyAppDir, { recursive: true });
+    fs.writeFileSync(path.join(dummyAppDir, ".gitignore"), "node_modules/\n.env\n");
+
+    ensureGitignoreProtection(dummyAppDir);
+    const gitignoreContent = fs.readFileSync(path.join(dummyAppDir, ".gitignore"), "utf-8");
+    assert(gitignoreContent.includes("docs/frontend-atlas/"), "Bootstrap auto-quarantines docs/frontend-atlas/ in .gitignore");
+    assert(gitignoreContent.includes("docs/backend-atlas/"), "Bootstrap auto-quarantines docs/backend-atlas/ in .gitignore");
+    assert(gitignoreContent.includes("docs/llms.txt"), "Bootstrap auto-quarantines docs/llms.txt in .gitignore");
+
+    // 2. Verify Causal Graph presence in .atlas-index.json
+    const atlasIndexPath = path.join(batch3AppDir, "docs", "frontend-atlas", ".atlas-index.json");
+    assert(fs.existsSync(atlasIndexPath), "Batch 3 generated .atlas-index.json");
+    const atlasIndexRaw = JSON.parse(fs.readFileSync(atlasIndexPath, "utf-8"));
+    assert(atlasIndexRaw.version === pkg.version, `.atlas-index.json has version v${pkg.version}`);
+    assert(atlasIndexRaw.causalGraph !== undefined, ".atlas-index.json contains pre-computed causalGraph");
+    assert(Array.isArray(atlasIndexRaw.causalGraph.nodes), "causalGraph contains nodes array");
 
     console.log(`\n============================================================`);
     console.log(`🎉 Test Matrix Complete: ${passedTests}/${totalTests} Passed (100% Success)`);

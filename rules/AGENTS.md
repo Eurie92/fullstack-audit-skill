@@ -71,7 +71,7 @@ Universal execution rule across all harnesses (Antigravity, Cursor, Claude Code,
   - **Zero Polling Invariant**: Do NOT loop on `manage_task status`. The harness features Reactive Wakeup and automatically resumes execution when tasks complete.
   - Run `fullstack_audit` or `npm run audit` upon milestone completion to synchronize atlases.
 
-### Available MCP Tools & CLI Commands (v2.13.5 Multi-Harness Engine)
+### Available MCP Tools & CLI Commands (v2.14.0 Multi-Harness Engine)
 - **Native MCP Tools**:
   - `fullstack_find`: Sub-3ms token-compact lookup for symbols, components, routes, queries, APIs.
   - `fullstack_locate_visual`: 0ms visual element locator (pulse dots, capsule pills, status badges, icons).

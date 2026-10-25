@@ -218,7 +218,7 @@ interface ProjectStructure {
 interface VisibleLabel {
   line: number;
   text: string;
-  type: "Button" | "Heading" | "Badge / Eyebrow" | "Modal Title" | "Aria Label" | "Action Link / CTA";
+  type: "Button" | "Heading" | "Badge / Eyebrow" | "Modal Title" | "Aria Label" | "Action Link / CTA" | "Hero / Body Text";
   snippet: string;
 }
 
@@ -858,6 +858,126 @@ const CARD_SURFACE_REGEX = /(?:class(?:Name)?|:class|class:list|v-bind:class)=["
 const MODAL_REGEX = /<(?:Dialog|Modal|Drawer|DrawerContent|DialogContent)\b|<div[^>]*role=["']dialog["']/g;
 const TYPOGRAPHY_REGEX = /\b(font-mono|font-sans|font-geist|font-jetbrains|text-(?:xs|sm|base|lg|xl|2xl|3xl|4xl|5xl))\b/g;
 
+/**
+ * Surgically extracts a multiline or single-line JSX/HTML element, correctly handling:
+ * - Nested braces in JSX attributes (e.g. onClick={(e) => handle(e)} or style={{...}})
+ * - Quotes ("...", '...', `...`)
+ * - Multiline formatting (lookahead up to maxLookahead lines)
+ * - Motion prefixes (e.g. motion.h1, motion.button, motion.div)
+ */
+function extractJsxElement(
+  lines: string[],
+  idx: number,
+  tagRegex: RegExp,
+  maxLookahead = 16
+): {
+  tagName: string;
+  innerText: string;
+  rawOpeningTag: string;
+  hasUppercase: boolean;
+  endLine: number;
+} | null {
+  const firstLine = lines[idx];
+  if (!tagRegex.test(firstLine)) return null;
+
+  const windowLines = lines.slice(idx, Math.min(lines.length, idx + maxLookahead));
+  const fullText = windowLines.join("\n");
+
+  const match = fullText.match(tagRegex);
+  if (!match || match.index === undefined) return null;
+
+  const tagStart = match.index;
+  const tagName = match[1];
+
+  let inDouble = false;
+  let inSingle = false;
+  let inBacktick = false;
+  let braceDepth = 0;
+  let openingTagEnd = -1;
+
+  for (let i = tagStart; i < fullText.length; i++) {
+    const ch = fullText[i];
+    const prev = i > tagStart ? fullText[i - 1] : "";
+
+    if (inDouble) {
+      if (ch === '"' && prev !== '\\') inDouble = false;
+    } else if (inSingle) {
+      if (ch === "'" && prev !== '\\') inSingle = false;
+    } else if (inBacktick) {
+      if (ch === '`' && prev !== '\\') inBacktick = false;
+    } else {
+      if (ch === '"') inDouble = true;
+      else if (ch === "'") inSingle = true;
+      else if (ch === '`') inBacktick = true;
+      else if (ch === '{') braceDepth++;
+      else if (ch === '}') {
+        if (braceDepth > 0) braceDepth--;
+      } else if (ch === '>' && braceDepth === 0) {
+        openingTagEnd = i;
+        break;
+      }
+    }
+  }
+
+  if (openingTagEnd === -1) return null;
+  // If self-closing: <Tag ... />
+  if (fullText[openingTagEnd - 1] === '/') return null;
+
+  const rawOpeningTag = fullText.slice(tagStart, openingTagEnd + 1);
+  const hasUppercase = /\b(?:uppercase|font-mono|tracking-widest)\b/.test(rawOpeningTag);
+
+  // Match closing tag </tagName> with depth tracking for nested tags of same name
+  const escapedTagName = tagName.replace(".", "\\.");
+  const remainder = fullText.slice(openingTagEnd + 1);
+
+  let depth = 1;
+  let closeTagEnd = -1;
+  const tagTokenRegex = new RegExp(`<(/?)${escapedTagName}\\b[^>]*>`, "gi");
+  let m: RegExpExecArray | null;
+  while ((m = tagTokenRegex.exec(remainder)) !== null) {
+    const isClose = m[1] === "/";
+    if (isClose) {
+      depth--;
+      if (depth === 0) {
+        closeTagEnd = m.index;
+        break;
+      }
+    } else {
+      if (!m[0].endsWith("/>")) {
+        depth++;
+      }
+    }
+  }
+
+  if (closeTagEnd === -1) {
+    const fallbackClose = remainder.match(new RegExp(`</${escapedTagName}>`, "i"));
+    if (!fallbackClose || fallbackClose.index === undefined) return null;
+    closeTagEnd = fallbackClose.index;
+  }
+
+  const rawInner = remainder.slice(0, closeTagEnd);
+  const cleanInner = rawInner
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\{[^}]+\}/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  const linesToEnd = fullText.slice(0, openingTagEnd + 1 + closeTagEnd).split("\n").length - 1;
+
+  return {
+    tagName,
+    innerText: cleanInner,
+    rawOpeningTag,
+    hasUppercase,
+    endLine: idx + 1 + linesToEnd,
+  };
+}
+
 // 4. File-Level Audit with Next.js Boundary Radar, a11y & Icon Indexing
 function auditFile(filePath: string, structure: ProjectStructure): ComponentAudit {
   const content = fs.readFileSync(filePath, "utf-8");
@@ -899,13 +1019,18 @@ function auditFile(filePath: string, structure: ProjectStructure): ComponentAudi
   let hasDirectStyleTag = false;
   let isExportedComponent = false;
 
-  function addLabel(line: number, text: string, type: VisibleLabel["type"], snippet: string) {
+  function addLabel(line: number, text: string, type: VisibleLabel["type"], snippet: string, hasUppercase = false) {
     const cleanText = text
       .replace(/<[^>]+>/g, " ")
       .replace(/\{[^}]+\}/g, " ")
+      .replace(/&amp;/g, "&")
+      .replace(/&quot;/g, '"')
+      .replace(/&apos;/g, "'")
+      .replace(/&lt;/g, "<")
+      .replace(/&gt;/g, ">")
       .replace(/\s+/g, " ")
       .trim();
-    if (!cleanText || cleanText.length < 2 || cleanText.length > 70) return;
+    if (!cleanText || cleanText.length < 2 || cleanText.length > 120) return;
     if (/^[()=><{}]+$/.test(cleanText)) return;
     const key = `${type}:${cleanText.toLowerCase()}:${line}`;
     if (!seenLabels.has(key)) {
@@ -916,6 +1041,20 @@ function auditFile(filePath: string, structure: ProjectStructure): ComponentAudi
         type,
         snippet: snippet.slice(0, 70),
       });
+    }
+
+    if (hasUppercase && cleanText.toUpperCase() !== cleanText) {
+      const upperText = cleanText.toUpperCase();
+      const upperKey = `${type}:${upperText.toLowerCase()}:${line}:upper`;
+      if (!seenLabels.has(upperKey)) {
+        seenLabels.add(upperKey);
+        visibleLabels.push({
+          line,
+          text: upperText,
+          type,
+          snippet: snippet.slice(0, 70),
+        });
+      }
     }
   }
 
@@ -972,8 +1111,9 @@ function auditFile(filePath: string, structure: ProjectStructure): ComponentAudi
     if (trimmed.includes("style={{") || trimmed.includes("style=\"")) hasDirectStyleTag = true;
 
     // Multiline-aware Button Tag Catchers + a11y Fast-Check (React, Vue, Svelte, Astro, Skeleton UI)
-    if (/<button\b/i.test(line)) {
-      const block = lines.slice(idx, idx + 4).join(" ");
+    if (/<(?:motion\.)?button\b/i.test(line)) {
+      const parsedBtn = extractJsxElement(lines, idx, /<((?:motion\.)?button)\b/i, 16);
+      const block = parsedBtn ? parsedBtn.rawOpeningTag : lines.slice(idx, Math.min(lines.length, idx + 6)).join(" ");
       const classMatch = block.match(/(?:class(?:Name)?|:class|class:list)=["'`]([^"'`]+)["'`]/);
       
       // Skeleton UI check: if <button contains class="btn", classify as UI button!
@@ -987,7 +1127,7 @@ function auditFile(filePath: string, structure: ProjectStructure): ComponentAudi
         // Accessibility checks (supporting :type, :aria-label, title, inner text, and template bindings)
         const hasType = /\b:?type=["'](?:button|submit|reset|['"](?:button|submit|reset)['"])["']/i.test(block);
         const hasAria = /\b(?:v-bind:)?(?::?aria-label|:?aria-labelledby|:?title)=["']/.test(block);
-        const hasDirectText = />\s*[^<{\s]+/.test(block) || /\{\{.+?\}\}/.test(block) || /\{.+?\}/.test(block);
+        const hasDirectText = (parsedBtn && parsedBtn.innerText.length > 0) || />\s*[^<{\s]+/.test(block) || /\{\{.+?\}\}/.test(block) || /\{.+?\}/.test(block);
         const missingAria = !hasAria && !hasDirectText;
         const missingType = !hasType;
 
@@ -1000,16 +1140,16 @@ function auditFile(filePath: string, structure: ProjectStructure): ComponentAudi
           missingType,
         });
 
-        const btnInner = block.match(/<button[^>]*>([\s\S]*?)<\/button>/i);
-        if (btnInner && btnInner[1]) {
-          addLabel(lineNum, btnInner[1], "Button", snippetContent);
+        if (parsedBtn && parsedBtn.innerText) {
+          addLabel(lineNum, parsedBtn.innerText, "Button", snippetContent, parsedBtn.hasUppercase);
         }
       }
     }
 
     // UI Buttons (React Button, Nuxt UButton, PrimeVue PButton, Svelte Button.Root, etc.)
     if (/<(?:Button|UButton|PButton|AstroButton)\b/.test(line) || /<Button\.Root\b/.test(line)) {
-      const block = lines.slice(idx, idx + 4).join(" ");
+      const parsedUiBtn = extractJsxElement(lines, idx, /<((?:Button|UButton|PButton|AstroButton|Button\.Root))\b/, 14);
+      const block = parsedUiBtn ? parsedUiBtn.rawOpeningTag : lines.slice(idx, Math.min(lines.length, idx + 4)).join(" ");
       const variantMatch = block.match(/(?:variant|color|severity)=["'`]([^"'`]+)["'`]/);
       uiButtons.push({
         line: lineNum,
@@ -1017,25 +1157,16 @@ function auditFile(filePath: string, structure: ProjectStructure): ComponentAudi
         variant: variantMatch ? variantMatch[1] : "default",
       });
 
-      const btnInner = block.match(/<(?:Button|UButton|PButton|AstroButton|Button\.Root)[^>]*>([\s\S]*?)<\/(?:Button|UButton|PButton|AstroButton|Button\.Root)>/i);
-      if (btnInner && btnInner[1]) {
-        addLabel(lineNum, btnInner[1], "Button", trimmed);
+      if (parsedUiBtn && parsedUiBtn.innerText) {
+        addLabel(lineNum, parsedUiBtn.innerText, "Button", trimmed, parsedUiBtn.hasUppercase);
       }
     }
 
-    // Action Links & Interactive CTAs (<a href="...">...</a>, <Link href="...">...</Link>, <NuxtLink ...>)
-    if (/<(?:a|Link|NuxtLink)\b/.test(line)) {
-      const block = lines.slice(idx, Math.min(lines.length, idx + 8)).join(" ");
-      const linkMatch = block.match(/<(?:a|Link|NuxtLink)[^>]*>([\s\S]*?)<\/(?:a|Link|NuxtLink)>/i);
-      if (linkMatch && linkMatch[1]) {
-        const innerText = linkMatch[1]
-          .replace(/<[^>]+>/g, " ")
-          .replace(/\{[^}]+\}/g, " ")
-          .replace(/\s+/g, " ")
-          .trim();
-        if (innerText && innerText.length >= 2 && innerText.length <= 70) {
-          addLabel(lineNum, innerText, "Action Link / CTA", trimmed);
-        }
+    // Action Links & Interactive CTAs (<a href="...">...</a>, <Link href="...">...</Link>, <NuxtLink ...>, <NavLink ...>)
+    if (/<(?:a|Link|NuxtLink|NavLink)\b/.test(line)) {
+      const parsedLink = extractJsxElement(lines, idx, /<((?:a|Link|NuxtLink|NavLink))\b/, 14);
+      if (parsedLink && parsedLink.innerText) {
+        addLabel(lineNum, parsedLink.innerText, "Action Link / CTA", trimmed, parsedLink.hasUppercase);
       }
     }
 
@@ -1062,31 +1193,50 @@ function auditFile(filePath: string, structure: ProjectStructure): ComponentAudi
     }
 
     // Accessible Names & Titles
-    const ariaMatch = line.match(/(?:aria-label|title)=["']([^"']{2,60})["']/);
+    const ariaMatch = line.match(/(?:aria-label|title)=["']([^"']{2,80})["']/);
     if (ariaMatch && ariaMatch[1]) {
       addLabel(lineNum, ariaMatch[1], "Aria Label", trimmed);
     }
 
-    // Headings (h1 - h4)
-    const headingMatch = line.match(/<(h[1-4])[^>]*>([\s\S]*?)<\/\1>/i);
-    if (headingMatch && headingMatch[2]) {
-      addLabel(lineNum, headingMatch[2], "Heading", trimmed);
+    // Headings (h1 - h6, motion.h1 - motion.h6)
+    if (/<(?:motion\.)?h[1-6]\b/i.test(line)) {
+      const parsedHeading = extractJsxElement(lines, idx, /<((?:motion\.)?h[1-6])\b/i, 16);
+      if (parsedHeading && parsedHeading.innerText) {
+        addLabel(lineNum, parsedHeading.innerText, "Heading", trimmed, parsedHeading.hasUppercase);
+      }
     }
 
-    // Dialog / Modal / Drawer Titles
-    const modalTitleMatch = line.match(/<(?:DialogTitle|ModalTitle|DrawerTitle)[^>]*>([\s\S]*?)<\/(?:DialogTitle|ModalTitle|DrawerTitle)>/i);
-    if (modalTitleMatch && modalTitleMatch[1]) {
-      addLabel(lineNum, modalTitleMatch[1], "Modal Title", trimmed);
+    // Hero Manifestos / Prominent Text (<motion.p ...>)
+    if (/<motion\.p\b/i.test(line)) {
+      const parsedP = extractJsxElement(lines, idx, /<(motion\.p)\b/i, 14);
+      if (parsedP && parsedP.innerText) {
+        addLabel(lineNum, parsedP.innerText, "Hero / Body Text", trimmed, parsedP.hasUppercase);
+      }
+    }
+
+    // Dialog / Modal / Drawer / Sheet / Card Titles
+    if (/<(?:DialogTitle|ModalTitle|DrawerTitle|SheetTitle|CardTitle)\b/i.test(line)) {
+      const parsedModalTitle = extractJsxElement(lines, idx, /<((?:DialogTitle|ModalTitle|DrawerTitle|SheetTitle|CardTitle))\b/i, 10);
+      if (parsedModalTitle && parsedModalTitle.innerText) {
+        addLabel(lineNum, parsedModalTitle.innerText, "Modal Title", trimmed, parsedModalTitle.hasUppercase);
+      }
     }
 
     // Badges & Prominent Spans (eyebrows / brand marks)
-    const badgeMatch = line.match(/<(?:Badge)[^>]*>([\s\S]*?)<\/Badge>/i);
-    if (badgeMatch && badgeMatch[1]) {
-      addLabel(lineNum, badgeMatch[1], "Badge / Eyebrow", trimmed);
+    if (/<(?:Badge)\b/i.test(line)) {
+      const parsedBadge = extractJsxElement(lines, idx, /<(Badge)\b/i, 10);
+      if (parsedBadge && parsedBadge.innerText) {
+        addLabel(lineNum, parsedBadge.innerText, "Badge / Eyebrow", trimmed, parsedBadge.hasUppercase);
+      }
     }
-    const spanBadgeMatch = line.match(/<span[^>]*class(?:Name)?=["'][^"']*(?:tracking-widest|uppercase|font-mono|rounded-full)[^"']*["'][^>]*>([\s\S]*?)<\/span>/i);
-    if (spanBadgeMatch && spanBadgeMatch[1]) {
-      addLabel(lineNum, spanBadgeMatch[1], "Badge / Eyebrow", trimmed);
+    if (/<span\b/i.test(line)) {
+      const spanWindow = lines.slice(idx, Math.min(lines.length, idx + 4)).join(" ");
+      if (/(?:tracking-widest|tracking-\[0\.[1-9]|uppercase|font-mono|rounded-full)/.test(spanWindow)) {
+        const parsedSpan = extractJsxElement(lines, idx, /<(span)\b/i, 10);
+        if (parsedSpan && parsedSpan.innerText) {
+          addLabel(lineNum, parsedSpan.innerText, "Badge / Eyebrow", trimmed, parsedSpan.hasUppercase);
+        }
+      }
     }
 
     // Visual Icon Usages Scan
@@ -3529,19 +3679,23 @@ function executeFastAtlasFind(query: string, compact: boolean): boolean {
     const raw = fs.readFileSync(indexPath, "utf-8");
     const index: AtlasIndex = JSON.parse(raw);
     const q = query.toLowerCase().trim();
+    const qNorm = q.replace(/[.,:;!?'"`\-_/\\()]/g, "").trim();
 
     const hits: { entry: AtlasIndexEntry; score: number }[] = [];
     index.entries.forEach(entry => {
       const sym = entry.symbol.toLowerCase();
+      const symNorm = sym.replace(/[.,:;!?'"`\-_/\\()]/g, "").trim();
       const file = entry.file.toLowerCase();
       const meta = (entry.meta || "").toLowerCase();
 
-      if (sym === q) {
+      if (sym === q || (qNorm && symNorm === qNorm)) {
         hits.push({ entry, score: 100 });
-      } else if (sym.startsWith(q)) {
-        hits.push({ entry, score: 75 });
-      } else if (sym.includes(q)) {
-        hits.push({ entry, score: 50 });
+      } else if (sym.startsWith(q) || (qNorm && symNorm.startsWith(qNorm))) {
+        hits.push({ entry, score: 85 });
+      } else if (sym.includes(q) || (qNorm && symNorm.includes(qNorm))) {
+        hits.push({ entry, score: 70 });
+      } else if (qNorm && qNorm.length >= 3 && symNorm.includes(qNorm)) {
+        hits.push({ entry, score: 60 });
       } else if (file.includes(q) || meta.includes(q)) {
         hits.push({ entry, score: 25 });
       }
@@ -3685,7 +3839,7 @@ function buildAndSaveAtlasIndex(
     });
 
     a.visibleLabels.forEach(l => {
-      if (l.text && l.text.length > 1 && l.text.length < 80) {
+      if (l.text && l.text.length > 1 && l.text.length <= 120) {
         entries.push({
           symbol: l.text,
           category: "label",
@@ -3753,11 +3907,17 @@ function buildAndSaveAtlasIndex(
   }
 
   // 6. Backend Integration (if backend atlas index exists)
-  const backendIndexPath = path.join(ROOT_DIR, "docs", "backend-atlas", ".backend-index.json");
+  let backendCausalGraph: any = undefined;
+  const backendIndexCandidate1 = path.join(path.dirname(outputDir), "backend-atlas", ".backend-index.json");
+  const backendIndexCandidate2 = path.join(ROOT_DIR, "docs", "backend-atlas", ".backend-index.json");
+  const backendIndexPath = fs.existsSync(backendIndexCandidate1) ? backendIndexCandidate1 : backendIndexCandidate2;
   if (fs.existsSync(backendIndexPath)) {
     try {
-      const bIndex: { entries: AtlasIndexEntry[] } = JSON.parse(fs.readFileSync(backendIndexPath, "utf-8"));
+      const bIndex: { entries: AtlasIndexEntry[]; causalGraph?: any } = JSON.parse(fs.readFileSync(backendIndexPath, "utf-8"));
       entries.push(...bIndex.entries);
+      if (bIndex.causalGraph) {
+        backendCausalGraph = bIndex.causalGraph;
+      }
     } catch {}
   }
 
@@ -3767,6 +3927,7 @@ function buildAndSaveAtlasIndex(
     generatedAt: new Date().toISOString(),
     totalEntries: entries.length,
     entries,
+    causalGraph: backendCausalGraph,
   };
 
   const outPath = path.join(outputDir, ".atlas-index.json");
@@ -4277,6 +4438,7 @@ export function executeVisualLocator(query: string, outputDir: string = OUTPUT_D
     const raw = fs.readFileSync(indexPath, "utf-8");
     const index: AtlasIndex = JSON.parse(raw);
     const q = query.toLowerCase().trim();
+    const qNorm = q.replace(/[.,:;!?'"`\-_/\\()]/g, "").trim();
 
     const visualCategories = new Set(["live-dot", "capsule-pill", "icon", "label", "overlay"]);
     const hits: { entry: AtlasIndexEntry; score: number }[] = [];
@@ -4284,13 +4446,15 @@ export function executeVisualLocator(query: string, outputDir: string = OUTPUT_D
     index.entries.forEach(entry => {
       const isVisual = visualCategories.has(entry.category);
       const sym = entry.symbol.toLowerCase();
+      const symNorm = sym.replace(/[.,:;!?'"`\-_/\\()]/g, "").trim();
       const meta = (entry.meta || "").toLowerCase();
       const file = entry.file.toLowerCase();
 
       let score = 0;
-      if (sym === q) score = 100;
-      else if (sym.startsWith(q)) score = 85;
-      else if (sym.includes(q)) score = 70;
+      if (sym === q || (qNorm && symNorm === qNorm)) score = 100;
+      else if (sym.startsWith(q) || (qNorm && symNorm.startsWith(qNorm))) score = 85;
+      else if (sym.includes(q) || (qNorm && symNorm.includes(qNorm))) score = 70;
+      else if (qNorm && qNorm.length >= 3 && symNorm.includes(qNorm)) score = 60;
       else if (meta.includes(q)) score = 50;
       else if (file.includes(q)) score = 30;
 
@@ -4332,7 +4496,21 @@ export function executePathTracer(fromQuery: string, toQuery: string, rootDir: s
   let nodes: any[] = [];
   let links: any[] = [];
 
-  if (fs.existsSync(graphPath)) {
+  // 1. Fast-Path A: In-memory pre-computed causalGraph from .atlas-index.json (0ms)
+  const indexPath = path.join(rootDir, "docs", "frontend-atlas", ".atlas-index.json");
+  if (fs.existsSync(indexPath)) {
+    try {
+      const raw = fs.readFileSync(indexPath, "utf-8");
+      const index = JSON.parse(raw);
+      if (index.causalGraph && Array.isArray(index.causalGraph.nodes) && index.causalGraph.nodes.length > 0) {
+        nodes = index.causalGraph.nodes;
+        links = index.causalGraph.links || [];
+      }
+    } catch {}
+  }
+
+  // 2. Fast-Path B: docs/graph.json
+  if (nodes.length === 0 && fs.existsSync(graphPath)) {
     try {
       const raw = fs.readFileSync(graphPath, "utf-8");
       const graphData: { nodes: any[]; links: any[] } = JSON.parse(raw);
@@ -6428,8 +6606,8 @@ async function main() {
     runUniversalFrontendAudit();
   } else {
     // Default: Fullstack Audit (Runs both Frontend Atlas AND Backend Atlas)
-    const res = runUniversalFrontendAudit();
     await runUniversalBackendAudit();
+    const res = runUniversalFrontendAudit();
     if (res && LLMS_MODE) {
       generateLlmsStandardFiles(res.routeMaps, res.structure);
     }

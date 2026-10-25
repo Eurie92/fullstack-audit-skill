@@ -1,7 +1,7 @@
 {
   "name": "fullstack-audit",
   "displayName": "Fullstack Audit & GPS Synergy Engine",
-  "version": "2.13.5",
+  "version": "2.14.0",
   "description": "Zero-latency fullstack atlas, design system catalog, and GPS locator with native MCP tools for instant code navigation.",
   "author": {
     "name": "Eurie Paulino",

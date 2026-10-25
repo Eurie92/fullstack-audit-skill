@@ -139,7 +139,7 @@ Universal execution rule across all harnesses (Antigravity, Cursor, Claude Code,
   - **Zero Polling Invariant**: Do NOT loop on `manage_task status`. The harness features Reactive Wakeup and automatically resumes execution when tasks complete.
   - Run `npm run audit` upon milestone completion to synchronize atlases.
 
-### Available Commands (v2.13.5 Multi-Harness Engine)
+### Available Commands (v2.14.0 Multi-Harness Engine)
 - `/fullstack-audit` or `npm run audit`: Regenerates the entire Fullstack Atlas and root `docs/llms.txt` / `docs/llms-full.txt`.
 - `npx fullstack-audit --find <query> --compact`: Ultra-fast, sub-3ms token-compact query mode for AI agents.
 - `npx fullstack-audit --locate-visual <query>`: 0ms visual element locator (pulse dots, capsule pills, status badges, icons).

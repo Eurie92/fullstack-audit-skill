@@ -3,9 +3,9 @@
  * Single source of truth for versioning, engine metadata, and harness definitions.
  */
 
-export const FULLSTACK_AUDIT_VERSION = "2.13.5";
-export const FULLSTACK_AUDIT_ENGINE = "Living Fullstack Atlas & Minimalist Engine v2.13.5";
-export const FULLSTACK_AUDIT_RELEASE_DATE = "2026-10-24";
+export const FULLSTACK_AUDIT_VERSION = "2.14.0";
+export const FULLSTACK_AUDIT_ENGINE = "Living Fullstack Atlas & Minimalist Engine v2.14.0";
+export const FULLSTACK_AUDIT_RELEASE_DATE = "2026-10-25";
 
 export type AuditProfile = "triad" | "standalone" | "custom";
 
@@ -45,10 +45,28 @@ export interface AtlasIndexEntry {
   atlasRef: string;
 }
 
+export interface CausalGraphNode {
+  id: string;
+  label?: string;
+  type: string;
+}
+
+export interface CausalGraphLink {
+  source: string;
+  target: string;
+  type: string;
+}
+
+export interface CausalGraph {
+  nodes: CausalGraphNode[];
+  links: CausalGraphLink[];
+}
+
 export interface AtlasIndex {
   version: string;
   engine: string;
   generatedAt: string;
   totalEntries: number;
   entries: AtlasIndexEntry[];
+  causalGraph?: CausalGraph;
 }

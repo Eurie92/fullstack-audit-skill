@@ -1,4 +1,4 @@
-# Unlocking the Full Potential of fullstack-audit (v2.13.3 Master Guide)
+# Unlocking the Full Potential of fullstack-audit (v2.14.0 Master Guide)
 
 > **The definitive operational playbook for software engineers and AI coding assistants (Antigravity, Cursor, Claude Code, Windsurf, Codex, VS Code).**
 

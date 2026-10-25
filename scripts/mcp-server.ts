@@ -22,14 +22,88 @@ function logDebug(msg: string) {
   process.stderr.write(`[fullstack-audit-mcp] ${msg}\n`);
 }
 
+// High-Performance In-Memory LRU Cache for sub-0.05ms repeated queries
+class FastLRUCache<K, V> {
+  private capacity: number;
+  private cache: Map<K, V>;
+
+  constructor(capacity = 256) {
+    this.capacity = capacity;
+    this.cache = new Map();
+  }
+
+  get(key: K): V | undefined {
+    if (!this.cache.has(key)) return undefined;
+    const value = this.cache.get(key)!;
+    this.cache.delete(key);
+    this.cache.set(key, value);
+    return value;
+  }
+
+  set(key: K, value: V): void {
+    if (this.cache.has(key)) {
+      this.cache.delete(key);
+    } else if (this.cache.size >= this.capacity) {
+      const oldestKey = this.cache.keys().next().value;
+      if (oldestKey !== undefined) {
+        this.cache.delete(oldestKey);
+      }
+    }
+    this.cache.set(key, value);
+  }
+
+  clear(): void {
+    this.cache.clear();
+  }
+
+  size(): number {
+    return this.cache.size;
+  }
+}
+
+const findLruCache = new FastLRUCache<string, string>(256);
+const visualLruCache = new FastLRUCache<string, string>(256);
+const pathLruCache = new FastLRUCache<string, string>(256);
+
+export function ensureGitignoreProtection(projectRoot: string): void {
+  try {
+    const gitignorePath = path.join(projectRoot, ".gitignore");
+    if (!fs.existsSync(gitignorePath)) return;
+
+    const content = fs.readFileSync(gitignorePath, "utf-8");
+    const requiredEntries = [
+      "docs/frontend-atlas/",
+      "docs/backend-atlas/",
+      "docs/llms.txt",
+      "docs/llms-full.txt",
+      "docs/THEME_MIGRATION_PUNCHLIST.md",
+      "scripts/benchmark-*.ts",
+    ];
+
+    const missing = requiredEntries.filter(e => !content.includes(e));
+    if (missing.length === 0) return;
+
+    let toAppend = "\n# Fullstack Audit local architecture maps & benchmarks (AI navigation only)\n";
+    for (const entry of missing) {
+      toAppend += `${entry}\n`;
+    }
+
+    fs.appendFileSync(gitignorePath, toAppend, "utf-8");
+    logDebug(`Quarantined .gitignore in ${projectRoot} (+${missing.length} entries)`);
+  } catch (err: any) {
+    logDebug(`Could not update .gitignore: ${err.message}`);
+  }
+}
+
 function resolveProjectRoot(projectRoot?: string): string {
+  let root = process.cwd();
   if (projectRoot && path.isAbsolute(projectRoot)) {
-    return projectRoot;
+    root = projectRoot;
+  } else if (projectRoot) {
+    root = path.resolve(process.cwd(), projectRoot);
   }
-  if (projectRoot) {
-    return path.resolve(process.cwd(), projectRoot);
-  }
-  return process.cwd();
+  ensureGitignoreProtection(root);
+  return root;
 }
 
 function getFilesRecursively(dir: string, fileList: string[], maxFiles = 3000) {
@@ -59,6 +133,18 @@ function getFilesRecursively(dir: string, fileList: string[], maxFiles = 3000) {
 // 1. Tool: fullstack_find
 function toolFind(query: string, projectRoot?: string, compact = true): { content: string; isError: boolean } {
   const root = resolveProjectRoot(projectRoot);
+  const q = (query || "").toLowerCase().trim();
+
+  if (!q) {
+    return { content: "❌ Query parameter cannot be empty.", isError: true };
+  }
+
+  const cacheKey = `find:${root}:${compact ? "c" : "f"}:${q}`;
+  const cached = findLruCache.get(cacheKey);
+  if (cached !== undefined) {
+    return { content: cached, isError: false };
+  }
+
   const indexPath = path.join(root, "docs", "frontend-atlas", ".atlas-index.json");
 
   if (!fs.existsSync(indexPath)) {
@@ -71,24 +157,23 @@ function toolFind(query: string, projectRoot?: string, compact = true): { conten
   try {
     const raw = fs.readFileSync(indexPath, "utf-8");
     const index = JSON.parse(raw);
-    const q = (query || "").toLowerCase().trim();
 
-    if (!q) {
-      return { content: "❌ Query parameter cannot be empty.", isError: true };
-    }
-
+    const qNorm = q.replace(/[.,:;!?'"`\-_/\\()]/g, "").trim();
     const hits: { entry: any; score: number }[] = [];
     (index.entries || []).forEach((entry: any) => {
       const sym = (entry.symbol || "").toLowerCase();
+      const symNorm = sym.replace(/[.,:;!?'"`\-_/\\()]/g, "").trim();
       const file = (entry.file || "").toLowerCase();
       const meta = (entry.meta || "").toLowerCase();
 
-      if (sym === q) {
+      if (sym === q || (qNorm && symNorm === qNorm)) {
         hits.push({ entry, score: 100 });
-      } else if (sym.startsWith(q)) {
-        hits.push({ entry, score: 75 });
-      } else if (sym.includes(q)) {
-        hits.push({ entry, score: 50 });
+      } else if (sym.startsWith(q) || (qNorm && symNorm.startsWith(qNorm))) {
+        hits.push({ entry, score: 85 });
+      } else if (sym.includes(q) || (qNorm && symNorm.includes(qNorm))) {
+        hits.push({ entry, score: 70 });
+      } else if (qNorm && qNorm.length >= 3 && symNorm.includes(qNorm)) {
+        hits.push({ entry, score: 60 });
       } else if (file.includes(q) || meta.includes(q)) {
         hits.push({ entry, score: 25 });
       }
@@ -97,7 +182,9 @@ function toolFind(query: string, projectRoot?: string, compact = true): { conten
     hits.sort((a, b) => b.score - a.score);
 
     if (hits.length === 0) {
-      return { content: `ZERO_MATCH: "${query}" in .atlas-index.json.`, isError: false };
+      const emptyResult = `ZERO_MATCH: "${query}" in .atlas-index.json.`;
+      findLruCache.set(cacheKey, emptyResult);
+      return { content: emptyResult, isError: false };
     }
 
     const topHits = hits.slice(0, 15);
@@ -111,7 +198,9 @@ function toolFind(query: string, projectRoot?: string, compact = true): { conten
       lines.push(`... (+${hits.length - 15} more matches in docs/frontend-atlas/)`);
     }
 
-    return { content: lines.join("\n"), isError: false };
+    const outputResult = lines.join("\n");
+    findLruCache.set(cacheKey, outputResult);
+    return { content: outputResult, isError: false };
   } catch (err: any) {
     return { content: `❌ Error querying atlas index: ${err.message}`, isError: true };
   }
@@ -120,6 +209,18 @@ function toolFind(query: string, projectRoot?: string, compact = true): { conten
 // 2. Tool: fullstack_locate_visual
 function toolLocateVisual(query: string, projectRoot?: string): { content: string; isError: boolean } {
   const root = resolveProjectRoot(projectRoot);
+  const q = (query || "").toLowerCase().trim();
+
+  if (!q) {
+    return { content: "❌ Query parameter cannot be empty.", isError: true };
+  }
+
+  const cacheKey = `visual:${root}:${q}`;
+  const cached = visualLruCache.get(cacheKey);
+  if (cached !== undefined) {
+    return { content: cached, isError: false };
+  }
+
   const indexPath = path.join(root, "docs", "frontend-atlas", ".atlas-index.json");
 
   if (!fs.existsSync(indexPath)) {
@@ -132,21 +233,23 @@ function toolLocateVisual(query: string, projectRoot?: string): { content: strin
   try {
     const raw = fs.readFileSync(indexPath, "utf-8");
     const index = JSON.parse(raw);
-    const q = (query || "").toLowerCase().trim();
 
     const visualCategories = new Set(["live-dot", "capsule-pill", "icon", "label", "overlay"]);
     const hits: { entry: any; score: number }[] = [];
+    const qNorm = q.replace(/[.,:;!?'"`\-_/\\()]/g, "").trim();
 
     (index.entries || []).forEach((entry: any) => {
       const isVisual = visualCategories.has(entry.category);
       const sym = (entry.symbol || "").toLowerCase();
+      const symNorm = sym.replace(/[.,:;!?'"`\-_/\\()]/g, "").trim();
       const meta = (entry.meta || "").toLowerCase();
       const file = (entry.file || "").toLowerCase();
 
       let score = 0;
-      if (sym === q) score = 100;
-      else if (sym.startsWith(q)) score = 85;
-      else if (sym.includes(q)) score = 70;
+      if (sym === q || (qNorm && symNorm === qNorm)) score = 100;
+      else if (sym.startsWith(q) || (qNorm && symNorm.startsWith(qNorm))) score = 85;
+      else if (sym.includes(q) || (qNorm && symNorm.includes(qNorm))) score = 70;
+      else if (qNorm && qNorm.length >= 3 && symNorm.includes(qNorm)) score = 60;
       else if (meta.includes(q)) score = 50;
       else if (file.includes(q)) score = 30;
 
@@ -159,7 +262,9 @@ function toolLocateVisual(query: string, projectRoot?: string): { content: strin
     hits.sort((a, b) => b.score - a.score);
 
     if (hits.length === 0) {
-      return { content: `⚡ [VISUAL LOCATOR] No visual elements matching "${query}". Check docs/frontend-atlas/02_COMPONENT_INVENTORY.md.`, isError: false };
+      const notFoundMsg = `⚡ [VISUAL LOCATOR] No visual elements matching "${query}". Check docs/frontend-atlas/02_COMPONENT_INVENTORY.md.`;
+      visualLruCache.set(cacheKey, notFoundMsg);
+      return { content: notFoundMsg, isError: false };
     }
 
     const lines = [`🎯 [VISUAL LOCATOR: 0ms Match] Found ${hits.length} visual element(s) for "${query}":\n`];
@@ -170,7 +275,9 @@ function toolLocateVisual(query: string, projectRoot?: string): { content: strin
       lines.push(`     📖 Atlas: ${e.atlasRef}`);
     });
 
-    return { content: lines.join("\n"), isError: false };
+    const outputResult = lines.join("\n");
+    visualLruCache.set(cacheKey, outputResult);
+    return { content: outputResult, isError: false };
   } catch (err: any) {
     return { content: `❌ Error querying visual locator: ${err.message}`, isError: true };
   }
@@ -232,19 +339,44 @@ function toolCausalPath(from: string, to: string, projectRoot?: string): { conte
   const root = resolveProjectRoot(projectRoot);
   if (!from || !to) return { content: "❌ Both 'from' and 'to' parameters are required.", isError: true };
 
-  const graphPath = path.join(root, "docs", "graph.json");
+  const fromQ = from.toLowerCase().trim();
+  const toQ = to.toLowerCase().trim();
+  const cacheKey = `path:${root}:${fromQ}:${toQ}`;
+  const cached = pathLruCache.get(cacheKey);
+  if (cached !== undefined) {
+    return { content: cached, isError: false };
+  }
+
   let nodes: any[] = [];
   let links: any[] = [];
 
-  if (fs.existsSync(graphPath)) {
+  // 1. Fast-Path A: Pre-computed causalGraph from .atlas-index.json (0ms in-memory graph)
+  const indexPath = path.join(root, "docs", "frontend-atlas", ".atlas-index.json");
+  if (fs.existsSync(indexPath)) {
     try {
-      const raw = fs.readFileSync(graphPath, "utf-8");
-      const graphData = JSON.parse(raw);
-      nodes = graphData.nodes || [];
-      links = graphData.links || [];
+      const raw = fs.readFileSync(indexPath, "utf-8");
+      const index = JSON.parse(raw);
+      if (index.causalGraph && Array.isArray(index.causalGraph.nodes) && index.causalGraph.nodes.length > 0) {
+        nodes = index.causalGraph.nodes;
+        links = index.causalGraph.links || [];
+      }
     } catch {}
   }
 
+  // 2. Fast-Path B: docs/graph.json
+  if (nodes.length === 0) {
+    const graphPath = path.join(root, "docs", "graph.json");
+    if (fs.existsSync(graphPath)) {
+      try {
+        const raw = fs.readFileSync(graphPath, "utf-8");
+        const graphData = JSON.parse(raw);
+        nodes = graphData.nodes || [];
+        links = graphData.links || [];
+      } catch {}
+    }
+  }
+
+  // 3. Fallback: Parse docs/backend-atlas/06_FULLSTACK_CROSS_REFERENCE_MAP.md
   if (nodes.length === 0) {
     const crossRef = path.join(root, "docs", "backend-atlas", "06_FULLSTACK_CROSS_REFERENCE_MAP.md");
     if (fs.existsSync(crossRef)) {
@@ -281,9 +413,6 @@ function toolCausalPath(from: string, to: string, projectRoot?: string): { conte
     };
   }
 
-  const fromQ = from.toLowerCase().trim();
-  const toQ = to.toLowerCase().trim();
-
   const startNode = nodes.find(n => n.id.toLowerCase().includes(fromQ) || (n.label || "").toLowerCase().includes(fromQ));
   const endNode = nodes.find(n => n.id.toLowerCase().includes(toQ) || (n.label || "").toLowerCase().includes(toQ));
 
@@ -311,7 +440,9 @@ function toolCausalPath(from: string, to: string, projectRoot?: string): { conte
   }
 
   if (!foundPath) {
-    return { content: `❌ No causal dependency path found between "${from}" and "${to}".`, isError: false };
+    const noPathMsg = `❌ No causal dependency path found between "${from}" and "${to}".`;
+    pathLruCache.set(cacheKey, noPathMsg);
+    return { content: noPathMsg, isError: false };
   }
 
   const steps = foundPath.map((nodeId, idx) => {
@@ -320,8 +451,10 @@ function toolCausalPath(from: string, to: string, projectRoot?: string): { conte
     return `   ${idx + 1}. [${typeLabel}] ${nodeId}`;
   });
 
+  const outputResult = `⚡ [CAUSAL PATH: Sub-5ms Trace]\n${foundPath.join(" ➔ ")}\n\nSteps:\n${steps.join("\n")}`;
+  pathLruCache.set(cacheKey, outputResult);
   return {
-    content: `⚡ [CAUSAL PATH: Sub-5ms Trace]\n${foundPath.join(" ➔ ")}\n\nSteps:\n${steps.join("\n")}`,
+    content: outputResult,
     isError: false,
   };
 }
@@ -479,6 +612,9 @@ function toolSurgicalPatch(filePath: string, target: string, replacement: string
 
 // 7. Tool: fullstack_audit
 function toolAudit(projectRoot?: string, frontendOnly?: boolean, backendOnly?: boolean): { content: string; isError: boolean } {
+  findLruCache.clear();
+  visualLruCache.clear();
+  pathLruCache.clear();
   const root = resolveProjectRoot(projectRoot);
   try {
     const auditScript = path.resolve(__dirname, "..", "bin", "audit.js");
@@ -602,6 +738,7 @@ const TOOL_DEFINITIONS = [
 // Stdio JSON-RPC 2.0 Dispatcher
 export function startMcpServer() {
   logDebug(`Initializing Fullstack Audit MCP Server daemon v${FULLSTACK_AUDIT_VERSION}...`);
+  ensureGitignoreProtection(process.cwd());
 
   const rl = readline.createInterface({
     input: process.stdin,

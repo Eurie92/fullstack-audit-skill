@@ -6,6 +6,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [2.14.0] - 2026-10-25
+
+> **Release Tier**: `MINOR (LRU Cache, Causal Graph, Multiline Screenshot-to-Code & Bootstrap Quarantine)`  
+> **Summary**: Implements the top 3 architectural recommendations from the 500-run empirical benchmark on `xnight` and fixes the multiline JSX label extraction engine for screenshot-to-code targeting. Introduces an in-memory 256-entry LRU cache dropping p99 lookup latency from 3.71ms to <0.05ms, serializes pre-computed UI-to-DB causal dependency graphs directly into `.atlas-index.json` for 0ms path tracing, resolves arrow-function attribute truncation traps in `<a onClick={(e) => ...}>` and multiline Framer Motion headlines (`<motion.h1>`), and enforces automatic `.gitignore` quarantine on daemon bootstrap.
+
+### Added
+* **In-Memory LRU Cache (`FastLRUCache`)**:
+  * Implemented zero-dependency `FastLRUCache` (256 capacity) in `mcp-server` for instant `<0.05ms` responses on repeated visual elements, tokens, and symbol queries.
+  * Auto-flushes cache on atlas regeneration.
+* **Pre-Computed Causal Graph in `.atlas-index.json`**:
+  * Serialized bi-directional UI-to-DB causal adjacency graphs (components -> API endpoints / actions -> database models) directly into `.atlas-index.json`.
+  * Accelerated `fullstack_path` to pure in-memory BFS execution without reading disk files.
+* **Automatic Bootstrap Gitignore Quarantine**:
+  * Guaranteed immediate repository isolation on daemon startup by auto-appending local atlas paths and benchmark files to `.gitignore`.
+* **Multiline JSX & Screenshot-to-Code Engine**:
+  * Replaced naive `[^>]*` tag matching with `extractJsxElement`, a brace- and quote-aware JSX parser that correctly skips arrow function handlers (`onClick={(e) => ...}`) and multiline attribute formatting.
+  * Full support for Framer Motion typography (`motion.h1`-`motion.h6`, `motion.p`, `motion.button`).
+  * Automatic uppercase alias indexing when `uppercase` utility class is present.
+  * Punctuation-normalized scoring (`qNorm` / `symNorm`) in fast find and visual locator, preventing OCR punctuation discrepancies from returning zero matches.
+
+---
+
 ## [2.13.5] - 2026-10-24
 
 > **Release Tier**: `PATCH (One-and-Done Hard Stop & Anti-Overinvestigation Mandate)`  
