@@ -16,10 +16,21 @@ if (args.includes("-v") || args.includes("--version")) {
     const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf-8"));
     console.log(`fullstack-audit v${pkg.version} (engine: AST reactive graph v2)`);
   } catch {
-    console.log("fullstack-audit v2.15.0 (engine: Living Fullstack Atlas & Minimalist Engine v2.15.0)");
+    console.log("fullstack-audit v2.16.0 (engine: Living Fullstack Atlas & Minimalist Engine v2.16.0)");
   }
   process.exit(0);
 }
+
+// Fast-Path for 1,000-Run Empirical Flight Test Benchmark
+if (args.includes("--flight-test") || args.includes("--benchmark-flight")) {
+  const flightScriptPath = path.resolve(__dirname, "../scripts/benchmark-1000-flight.ts");
+  const localTsx = path.resolve(__dirname, "../node_modules/tsx/dist/cli.mjs");
+  const npxCmd = process.platform === "win32" ? "npx.cmd" : "npx";
+  const runner = fs.existsSync(localTsx)
+    ? spawn(process.execPath, [localTsx, flightScriptPath], { stdio: "inherit", shell: false })
+    : spawn(npxCmd, ["tsx", flightScriptPath], { stdio: "inherit", shell: process.platform === "win32" });
+  runner.on("exit", (code) => process.exit(code ?? 0));
+} else {
 
 const scriptPath = path.resolve(__dirname, "../scripts/audit.ts");
 
@@ -52,3 +63,4 @@ child.on("error", (err) => {
 child.on("exit", (code) => {
   process.exit(code ?? 0);
 });
+}

@@ -1,6 +1,6 @@
 {
   "name": "fullstack-audit-skill",
-  "version": "2.15.0",
+  "version": "2.16.0",
   "description": "High-performance architecture atlas and GPS companion for AI coding assistants. Auto-discovers Next.js, React, Vite, Nuxt 3, SvelteKit, Astro, Remix, and React Router v7. Catalogs frontend routes, components, tokens, modals, and pills into docs/frontend-atlas/, and catalogs API routes, Prisma/Drizzle models, server actions, auth guards, and webhooks into docs/backend-atlas/.",
   "type": "module",
   "main": "scripts/audit.ts",
@@ -14,6 +14,7 @@
     "audit:backend": "node bin/audit.js --backend",
     "audit:all": "node bin/audit.js --all",
     "audit:theme": "node bin/audit.js --theme",
+    "benchmark:flight": "npx tsx scripts/benchmark-1000-flight.ts",
     "sync:plugin": "powershell -ExecutionPolicy Bypass -File scripts/sync-plugin.ps1",
     "test": "node bin/audit.js",
     "test:frameworks": "npx tsx scripts/test-frameworks.ts",

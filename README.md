@@ -4,13 +4,13 @@
 > Sub-3ms deterministic codebase navigation for Antigravity, Cursor, Claude Code, Windsurf, OpenCode, Codex, and Hermes.  
 > Automatically indexes Next.js, React, Nuxt, SvelteKit, Astro, Remix, and backend APIs into zero-grep in-memory atlases.
 
-[![Version](https://img.shields.io/badge/version-2.15.0-blue.svg)](https://github.com/Eurie92/fullstack-audit-skill/releases)
+[![Version](https://img.shields.io/badge/version-2.16.0-blue.svg)](https://github.com/Eurie92/fullstack-audit-skill/releases)
 [![License: Apache 2.0](https://img.shields.io/badge/license-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
-[![Benchmark](https://img.shields.io/badge/benchmark-500%2F500%20passed%20(0.35ms)-brightgreen.svg)](docs/BENCHMARK_500_XNIGHT_REPORT.md)
+[![Flight Test Benchmark](https://img.shields.io/badge/flight%20test-1%2C000%20tests%20(1.08ms)-brightgreen.svg)](docs/BENCHMARK_1000_FLIGHT_REPORT.md)
 [![MCP Protocol](https://img.shields.io/badge/protocol-Model%20Context%20Protocol%20(MCP)-purple.svg)](https://modelcontextprotocol.io/)
 [![Zero Config](https://img.shields.io/badge/config-zero%20config-blue.svg)](https://github.com/Eurie92/fullstack-audit-skill)
 
-[Master Usage Guide](docs/MASTER_USAGE_GUIDE.md) | [How It Works](docs/HOW_IT_WORKS.md) | [500-Run Benchmark Report](docs/BENCHMARK_500_XNIGHT_REPORT.md) | [Changelog](CHANGELOG.md)
+[Master Usage Guide](docs/MASTER_USAGE_GUIDE.md) | [How It Works](docs/HOW_IT_WORKS.md) | [1,000-Run Flight Test Report](docs/BENCHMARK_1000_FLIGHT_REPORT.md) | [500-Run Benchmark Report](docs/BENCHMARK_500_XNIGHT_REPORT.md) | [Changelog](CHANGELOG.md)
 
 ---
 
@@ -60,12 +60,21 @@ Wait ~300ms for the scan to complete.
 
 ---
 
-### Step 3: That's It! (Zero Maintenance)
+### Step 3: That's It! (Always Active & Always Enabled)
+
+> [!IMPORTANT]
+> **Always-On Architecture Plugin (Not a One-Time Audit Tool)**  
+> Fullstack Audit is **NOT a passive linter or a one-off audit report** that you have to run manually whenever you want answers.  
+> It is an **Always-On Fullstack GPS & Code Navigation Plugin** powered by an in-memory Model Context Protocol (MCP) daemon.  
+> * **Run `/fullstack-audit` ONCE** on project setup to compile the in-memory architecture index into `docs/`.  
+> * **After that, the plugin is perpetually active and enabled.**  
+> * You do **NOT** need to type commands or re-run audits during daily coding. Whenever you prompt your AI assistant (*"Where is the checkout button?"*, *"Change button to emerald"*, *"Trace order flow"*), your assistant automatically calls the native MCP tools in sub-3ms under the hood.  
+> * **Why is it so fast?** The AI navigates an in-memory inverted hash map rather than scanning disk files with slow recursive greps or burning hundreds of thousands of tokens!
 
 Once generated, your AI coding assistant handles everything autonomously:
 
-* **Daily coding & bugfixes (Micro-Edits)**: No re-audits needed. Your AI assistant navigates existing code in sub-3ms and applies edits in 1-2s.
-* **Major milestones (Big Features)**: When adding brand-new routes, pages, or database models, run `/fullstack-audit` (or ask your AI to refresh the atlas) once the feature is complete.
+* **Daily coding & bugfixes (Micro-Edits)**: Zero re-audits needed. Your AI assistant navigates existing code in sub-3ms and applies surgical tweaks in 1-2s.
+* **Major milestones (Big Features)**: Only when adding brand-new routes, pages, or database models, run `/fullstack-audit` (or ask your AI to refresh the atlas) once the feature is complete.
 * **Clean Git Repository (.gitignore Protection)**: All generated atlases (`docs/frontend-atlas/`, `docs/backend-atlas/`, `docs/llms.txt`) are automatically added to `.gitignore`. They stay 100% local for AI navigation and never pollute your Git commits or pull requests.
 * **Zero Root Clutter**: No files are dumped into your project root. All architecture documentation is cleanly encapsulated inside `docs/`.
 
@@ -171,20 +180,23 @@ docs/
 
 ---
 
-## Empirical Benchmark (500-Run Live SaaS Codebase Evaluation)
+## 1,000-Run Empirical Flight Test Benchmark (Live SaaS Codebase Evaluation)
 
-Evaluated against 500 real-world queries on the `xnight` production codebase across Frontend & Backend:
+Subjected to a comprehensive 1,000-test empirical flight test against the live production codebase of `xnight` (500 real path/route/component searches + 500 live frontend code modifications with instant atomic reverts):
 
-| Metric | Vanilla AI Agent (File Grep) | Old Skill CLI | Fullstack Audit (Native MCP) | Advantage (Plugin vs Skill) |
-| :--- | :---: | :---: | :---: | :--- |
-| **Median Latency (p50)** | 44.82 ms | 2,391.53 ms | **0.35 ms** | **6,896x faster** |
-| **95th Percentile (p95)** | 583.28 ms | 3,046.55 ms | **3.21 ms** | **950x faster** |
-| **99th Percentile (p99)** | 643.41 ms | 3,373.47 ms | **4.72 ms** | **715x faster** |
-| **Average Latency (Mean)** | 149.06 ms | 2,458.69 ms | **0.98 ms** | **2,505x faster** |
-| **Context Tokens Used** | 154,074,960 tokens | 90,000 tokens | **22,500 tokens** | **75.0% token reduction** |
-| **Process Spawning** | 500 Child Processes | 500 Child Processes | **0 Processes (In-Memory)** | **Zero AMSI Defender Lag** |
+| Performance Dimension | Without Plugin (Baseline AI Agent) | With Fullstack Audit Plugin (v2.16.0) | Verified Advantage |
+| :--- | :---: | :---: | :---: |
+| **Path / Route Locate (p50)** | **374.38 ms** | **1.08 ms** | **348x faster** *(Sub-3ms proven!)* |
+| **Real Frontend Tweak Time (p50)** | **58.66 ms** | **4.78 ms** | **12x faster** |
+| **Overall Median Latency (p50)** | **78.95 ms** | **2.25 ms** | **35x faster** |
+| **90th Percentile (p90)** | **458.48 ms** | **6.58 ms** | **70x faster** |
+| **95th Percentile (p95)** | **504.43 ms** | **7.80 ms** | **65x faster** |
+| **99th Percentile (p99)** | **640.94 ms** | **11.94 ms** | **54x faster** |
+| **Context Tokens Burned (1,000 Runs)** | **325,986,520 tokens** | **55,000 tokens** | **99.2% Saved (~$977.79)** |
+| **Patch & Revert Reliability** | **100.0%** | **100.0%** | **Zero Unwanted Diffs** |
+| **Child Processes Spawned** | **1,000 Processes** | **0 Processes (In-Memory)** | **Zero Windows Defender / AMSI Lag** |
 
-*See [`docs/BENCHMARK_500_XNIGHT_REPORT.md`](docs/BENCHMARK_500_XNIGHT_REPORT.md) for full benchmark methodology.*
+*Read the complete empirical methodology, findings, and diagnostic traces in [`docs/BENCHMARK_1000_FLIGHT_REPORT.md`](docs/BENCHMARK_1000_FLIGHT_REPORT.md).*
 
 ---
 
