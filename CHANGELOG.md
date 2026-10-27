@@ -9,7 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ## [2.16.0] - 2026-10-27
 
 > **Release Tier**: `MINOR (1,000-Run Empirical Flight Test Benchmark Suite & Head-to-Head Tweak Mutator)`  
-> **Summary**: Introduces the deterministic 1,000-Run Empirical Flight Test Benchmark Engine (`scripts/benchmark-1000-flight.ts` / `--flight-test`), evaluating 500 path & route lookups alongside 500 real frontend code mutations on the production `xnight` SaaS codebase. Verified the sub-3ms claim with actual **1.08ms (p50)** lookups (322x faster than baseline disk greps) and **5.28ms (p50)** frontend surgical tweaks (11x faster). Saved **~98.3% estimated context tokens (~3.1M tokens saved vs ~55k tokens)** with 100.0% clean revert safety.
+> **Summary**: Introduces the deterministic 1,000-Run Empirical Flight Test Benchmark Engine (`scripts/benchmark-1000-flight.ts` / `--flight-test`), evaluating 500 path & route lookups alongside 500 real frontend code mutations on the production SaaS codebase of [xnight.dev](https://xnight.dev/). Verified the sub-3ms claim with actual **1.08ms (p50)** lookups (322x faster than baseline disk greps) and **5.28ms (p50)** frontend surgical tweaks (11x faster). Saved **~98.3% estimated context tokens (~3.1M tokens saved vs ~55k tokens)** with 100.0% clean revert safety.
 
 ### Added
 * **1,000-Run Empirical Flight Test Benchmark (`scripts/benchmark-1000-flight.ts`, `docs/BENCHMARK_1000_FLIGHT_REPORT.md`)**:

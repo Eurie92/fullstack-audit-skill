@@ -1,6 +1,6 @@
 # 1,000-Run Comprehensive Empirical Flight Test & Tweak Benchmark Report
 
-> **Target Codebase:** `xnight` (`C:\Users\EURIE\Dev\SaaS\xnight`)  
+> **Target Codebase:** [xnight.dev](https://xnight.dev/) (Production Next.js SaaS & Digital Goods Platform)  
 > **Evaluation Engine:** `scripts/benchmark-1000-flight.ts` (Deterministic Multi-Track Flight Suite)  
 > **Execution Date:** 2026-10-27  
 > **Total Test Trials:** 1,000 Executions (500 Path/Route/Component Searches + 500 Real Frontend Code Tweaks)  
@@ -11,7 +11,7 @@
 
 ## 1. Executive Summary: The Definitive Head-to-Head Showdown
 
-The **Fullstack Audit Native MCP Plugin** was subjected to an exhaustive 1,000-run flight test against a real production SaaS codebase (`xnight`), comparing it directly against the default baseline behavior of standard AI coding assistants (sequential file greps, recursive scans, full-file reads, and whole-file rewrites).
+The **Fullstack Audit Native MCP Plugin** was subjected to an exhaustive 1,000-run flight test against a real production SaaS codebase ([xnight.dev](https://xnight.dev/)), comparing it directly against the default baseline behavior of standard AI coding assistants (sequential file greps, recursive scans, full-file reads, and whole-file rewrites).
 
 ### Head-to-Head Performance Scorecard
 
@@ -32,7 +32,7 @@ The **Fullstack Audit Native MCP Plugin** was subjected to an exhaustive 1,000-r
 ## 2. Test Methodology & Real-World Flight Conditions
 
 ### Why This Is Not Just a Synthetic Mean/Median Test
-Standard benchmarks often measure only string matching in an isolated dummy array. This flight test was conducted **directly inside the active production repository of `xnight`**, testing real Next.js App Router structures, complex Tailwind design tokens, and mission-critical UI components.
+Standard benchmarks often measure only string matching in an isolated dummy array. This flight test was conducted **directly inside the active production repository of [xnight.dev](https://xnight.dev/)**, testing real Next.js App Router structures, complex Tailwind design tokens, and mission-critical UI components.
 
 ### Breakdown of the 1,000 Trials:
 1. **500 Path & Route / Component Discovery Trials**:
@@ -49,8 +49,8 @@ Standard benchmarks often measure only string matching in an isolated dummy arra
    - **Backend API & Middleware Tweaks**: Testing status code changes (`status: 200` -> `201`), auth headers, and session cookie identifiers.
 
 ### The Safety Isolation & Auto-Revert Protocol:
-- **Instant Rollback**: Every single tweak trial mutated the actual source file on disk in `xnight`, verified that the mutation was live and readable, and immediately executed an atomic revert.
-- **Pre-Flight & Post-Flight Gate**: The benchmark verified that `git status --porcelain` in `xnight` was completely clean before starting and re-verified at trial 1,000. **Not a single line of unwanted code remained in `xnight`.**
+- **Instant Rollback**: Every single tweak trial mutated the actual source file on disk in [xnight.dev](https://xnight.dev/), verified that the mutation was live and readable, and immediately executed an atomic revert.
+- **Pre-Flight & Post-Flight Gate**: The benchmark verified that `git status --porcelain` was completely clean before starting and re-verified at trial 1,000. **Not a single line of unwanted code remained in the project.**
 
 ---
 

@@ -194,7 +194,7 @@ Fullstack Audit works 100% out-of-the-box on its own. For developers who want to
 
 ## 1,000-Run Empirical Flight Test Benchmark (Live SaaS Codebase Evaluation)
 
-Subjected to a comprehensive 1,000-test empirical flight test against the live production codebase of `xnight` (500 real path/route/component searches + 500 live frontend code modifications with instant atomic reverts):
+Subjected to a comprehensive 1,000-test empirical flight test against the live production codebase of [xnight.dev](https://xnight.dev/) (500 real path/route/component searches + 500 live frontend code modifications with instant atomic reverts):
 
 | Performance Dimension | Without Plugin (Baseline AI Agent) | With Fullstack Audit Plugin (v2.16.0) | Verified Advantage |
 | :--- | :---: | :---: | :---: |
