@@ -9,7 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ## [2.16.0] - 2026-10-27
 
 > **Release Tier**: `MINOR (1,000-Run Empirical Flight Test Benchmark Suite & Head-to-Head Tweak Mutator)`  
-> **Summary**: Introduces the deterministic 1,000-Run Empirical Flight Test Benchmark Engine (`scripts/benchmark-1000-flight.ts` / `--flight-test`), evaluating 500 path & route lookups alongside 500 real frontend code mutations on the production `xnight` SaaS codebase. Verified the sub-3ms claim with actual **1.08ms (p50)** lookups (348x faster than baseline disk greps) and **4.78ms (p50)** frontend surgical tweaks (12x faster). Saved **99.2% context tokens (325,931,520 tokens)** with 100.0% clean revert safety.
+> **Summary**: Introduces the deterministic 1,000-Run Empirical Flight Test Benchmark Engine (`scripts/benchmark-1000-flight.ts` / `--flight-test`), evaluating 500 path & route lookups alongside 500 real frontend code mutations on the production `xnight` SaaS codebase. Verified the sub-3ms claim with actual **1.08ms (p50)** lookups (322x faster than baseline disk greps) and **5.28ms (p50)** frontend surgical tweaks (11x faster). Saved **~98.3% estimated context tokens (~3.1M tokens saved vs ~55k tokens)** with 100.0% clean revert safety.
 
 ### Added
 * **1,000-Run Empirical Flight Test Benchmark (`scripts/benchmark-1000-flight.ts`, `docs/BENCHMARK_1000_FLIGHT_REPORT.md`)**:
@@ -19,6 +19,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   * Rigorous Git Safety Verification Gate guaranteeing zero uncommitted changes and 0 residual diffs in consumer codebases.
 * **CLI Command Flag (`--flight-test` / `--benchmark-flight`, `bin/audit.js`)**:
   * Direct terminal execution to run the 1,000-run flight test suite in one command.
+* **Optional Minimalist Synergy Stack Documentation (`README.md`)**:
+  * Clear guide for optionally combining Fullstack Audit with **Ponytail** (anti-overengineering), **Caveman** (zero-fluff chat tokens), and **Superpowers** (disciplined verification).
 
 ### Changed
 * **CLI Banner & Constants Sync**:

@@ -180,19 +180,31 @@ docs/
 
 ---
 
+## Optional Synergy: Minimalist Token-Saver Stack
+
+Fullstack Audit works 100% out-of-the-box on its own. For developers who want to push token efficiency, speed, and clean code architecture even further, it seamlessly pairs with these 3 optional plugins:
+
+* **[Ponytail](https://github.com/Eurie92/ponytail-skill)** *(Anti-Overengineering & YAGNI)*: Enforces the shortest working diff. Stops AI assistants from adding bloated abstractions, unasked options, or speculative dependencies.
+* **[Caveman](https://github.com/Eurie92/caveman-skill)** *(Zero-Fluff Responses)*: Strips conversational filler, apologies, and chatter from AI outputs, cutting response tokens by 60–75%.
+* **[Superpowers](https://github.com/Eurie92/superpowers-plugin)** *(Dual-Speed Verification)*: Provides disciplined test verification and branch completion gates without slowing down everyday micro-edits.
+
+*(These companion plugins are completely modular and optional—use whatever fits your workflow!)*
+
+---
+
 ## 1,000-Run Empirical Flight Test Benchmark (Live SaaS Codebase Evaluation)
 
 Subjected to a comprehensive 1,000-test empirical flight test against the live production codebase of `xnight` (500 real path/route/component searches + 500 live frontend code modifications with instant atomic reverts):
 
 | Performance Dimension | Without Plugin (Baseline AI Agent) | With Fullstack Audit Plugin (v2.16.0) | Verified Advantage |
 | :--- | :---: | :---: | :---: |
-| **Path / Route Locate (p50)** | **374.38 ms** | **1.08 ms** | **348x faster** *(Sub-3ms proven!)* |
-| **Real Frontend Tweak Time (p50)** | **58.66 ms** | **4.78 ms** | **12x faster** |
-| **Overall Median Latency (p50)** | **78.95 ms** | **2.25 ms** | **35x faster** |
-| **90th Percentile (p90)** | **458.48 ms** | **6.58 ms** | **70x faster** |
-| **95th Percentile (p95)** | **504.43 ms** | **7.80 ms** | **65x faster** |
-| **99th Percentile (p99)** | **640.94 ms** | **11.94 ms** | **54x faster** |
-| **Context Tokens Burned (1,000 Runs)** | **325,986,520 tokens** | **55,000 tokens** | **99.2% Saved (~$977.79)** |
+| **Path / Route Locate (p50)** | **347.02 ms** | **1.08 ms** | **322x faster** *(Sub-3ms verified!)* |
+| **Real Frontend Tweak Time (p50)** | **60.13 ms** | **5.28 ms** | **11x faster** |
+| **Overall Median Latency (p50)** | **64.95 ms** | **2.00 ms** | **32x faster** |
+| **90th Percentile (p90)** | **421.62 ms** | **5.77 ms** | **73x faster** |
+| **95th Percentile (p95)** | **473.50 ms** | **6.97 ms** | **68x faster** |
+| **99th Percentile (p99)** | **725.12 ms** | **7.79 ms** | **93x faster** |
+| **Context Tokens Burned (1,000 Runs)** | **~3,155,600 tokens (Est.)** | **~55,000 tokens** | **~98.3% Tokens Saved (~$9.30)** |
 | **Patch & Revert Reliability** | **100.0%** | **100.0%** | **Zero Unwanted Diffs** |
 | **Child Processes Spawned** | **1,000 Processes** | **0 Processes (In-Memory)** | **Zero Windows Defender / AMSI Lag** |
 
