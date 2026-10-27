@@ -10,7 +10,7 @@
 [![MCP Protocol](https://img.shields.io/badge/protocol-Model%20Context%20Protocol%20(MCP)-purple.svg)](https://modelcontextprotocol.io/)
 [![Zero Config](https://img.shields.io/badge/config-zero%20config-blue.svg)](https://github.com/Eurie92/fullstack-audit-skill)
 
-[Master Usage Guide](docs/MASTER_USAGE_GUIDE.md) | [How It Works](docs/HOW_IT_WORKS.md) | [1,000-Run Flight Test Report](docs/BENCHMARK_1000_FLIGHT_REPORT.md) | [500-Run Benchmark Report](docs/BENCHMARK_500_XNIGHT_REPORT.md) | [Changelog](CHANGELOG.md)
+[Master Usage Guide](docs/MASTER_USAGE_GUIDE.md) | [How It Works](docs/HOW_IT_WORKS.md) | [1,000-Run Flight Test Report](docs/BENCHMARK_1000_FLIGHT_REPORT.md) | [Changelog](CHANGELOG.md)
 
 ---
 
