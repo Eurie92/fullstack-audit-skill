@@ -8,7 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [2.16.0] - 2026-10-27
 
-> **Release Tier**: `MINOR (1,000-Run Empirical Flight Test Benchmark Suite, Head-to-Head Tweak Mutator & Discord Release Protocol)`  
+> **Release Tier**: `MINOR (1,000-Run Empirical Flight Test Benchmark Suite & Head-to-Head Tweak Mutator)`  
 > **Summary**: Introduces the deterministic 1,000-Run Empirical Flight Test Benchmark Engine (`scripts/benchmark-1000-flight.ts` / `--flight-test`), evaluating 500 path & route lookups alongside 500 real frontend code mutations on the production `xnight` SaaS codebase. Verified the sub-3ms claim with actual **1.08ms (p50)** lookups (348x faster than baseline disk greps) and **4.78ms (p50)** frontend surgical tweaks (12x faster). Saved **99.2% context tokens (325,931,520 tokens)** with 100.0% clean revert safety.
 
 ### Added
@@ -19,8 +19,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   * Rigorous Git Safety Verification Gate guaranteeing zero uncommitted changes and 0 residual diffs in consumer codebases.
 * **CLI Command Flag (`--flight-test` / `--benchmark-flight`, `bin/audit.js`)**:
   * Direct terminal execution to run the 1,000-run flight test suite in one command.
-* **Ready-to-Post Discord Announcement Template**:
-  * Pre-formatted release announcement with concrete benchmark metrics, P50/P90/P95 latencies, token savings, and copy-paste installer.
 
 ### Changed
 * **CLI Banner & Constants Sync**:

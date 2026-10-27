@@ -659,29 +659,6 @@ Based on the empirical findings of this 1,000-run flight test, here are the top 
 ### Recommendation 3: Automated Self-Healing CRLF Line-Ending Normalization
 - During the 500 tweak trials, differences between Windows \`\\r\\n\` (CRLF) and Linux \`\\n\` (LF) in target files can occasionally cause exact-match string replacements to miss.
 - **Action**: The \`fullstack_patch\` engine already handles CRLF normalization; ensuring this is enforced across all foreign harnesses will guarantee 100% patch reliability anywhere.
-
----
-
-## 5. Ready-to-Post Discord Announcement
-
-\`\`\`markdown
-🚀 **Fullstack Audit v2.16.0 Flight Test Benchmark Results (1,000 Real Trials)** 🚀
-
-We just completed an exhaustive 1,000-run flight test benchmarking **Fullstack Audit** against standard AI coding assistant workflows on our real production SaaS codebase (\`xnight\`).
-
-Here are the verified results:
-⚡ **Lookup & Navigation**: **${pStatsLocate.p50.toFixed(2)} ms** vs ${bStatsLocate.p50.toFixed(2)} ms (**${speedupLocate.toFixed(0)}x faster**) — *The <3ms claim is 100% real!*
-🛠️ **Real Frontend Tweaks**: **${pStatsTweak.p50.toFixed(2)} ms** vs ${bStatsTweak.p50.toFixed(2)} ms (**${speedupTweak.toFixed(0)}x faster**)
-🧠 **Context Tokens Burned**: **${pluginTokensTotal.toLocaleString()} tokens** vs ${baselineTokensTotalEstimated.toLocaleString()} tokens (**99.2% tokens saved**)
-🛡️ **OS & Process Overhead**: **0 child processes** (Zero Windows Defender / AMSI lag)
-🎯 **Safety**: 1,000 tweaks tested and reverted with 0 residual code or syntax errors.
-
-**Quick Install:**
-\`\`\`bash
-npx fullstack-audit --install
-\`\`\`
-Or run \`/fullstack-audit\` inside your workspace! Check out \`docs/BENCHMARK_1000_FLIGHT_REPORT.md\` for the full breakdown.
-\`\`\`
 `;
 
   fs.writeFileSync(reportPath, reportContent, "utf-8");
