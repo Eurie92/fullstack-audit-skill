@@ -4,7 +4,7 @@
 > Sub-3ms deterministic codebase navigation for Antigravity, Cursor, Claude Code, Windsurf, OpenCode, Codex, and Hermes.  
 > Automatically indexes Next.js, React, Nuxt, SvelteKit, Astro, Remix, and backend APIs into zero-grep in-memory atlases.
 
-[![Version](https://img.shields.io/badge/version-2.16.0-blue.svg)](https://github.com/Eurie92/fullstack-audit-skill/releases)
+[![Version](https://img.shields.io/badge/version-2.17.0-blue.svg)](https://github.com/Eurie92/fullstack-audit-skill/releases)
 [![License: Apache 2.0](https://img.shields.io/badge/license-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Flight Test Benchmark](https://img.shields.io/badge/flight%20test-1%2C000%20tests%20(1.08ms)-brightgreen.svg)](docs/BENCHMARK_1000_FLIGHT_REPORT.md)
 [![MCP Protocol](https://img.shields.io/badge/protocol-Model%20Context%20Protocol%20(MCP)-purple.svg)](https://modelcontextprotocol.io/)
@@ -126,7 +126,7 @@ Once installed, **you do not need to run manual terminal commands during daily w
 
 ---
 
-## The 7 Native MCP Tools
+## The 10 Native MCP Tools
 
 | Tool | Functionality | Example AI Prompt | Speed |
 | :--- | :--- | :--- | :---: |
@@ -136,12 +136,19 @@ Once installed, **you do not need to run manual terminal commands during daily w
 | **`fullstack_path`** | Causal execution path tracer (`UI Component -> API Route -> DB Model`). | *"Trace what happens when clicking Place Order"* | **Sub-5ms** |
 | **`fullstack_symbol`** | Retrieves exact start & end line numbers for functions inside God-files (>500 lines). | Slices just lines 140–185 instead of burning tokens on the whole file | **Sub-1ms** |
 | **`fullstack_patch`** | Surgical CRLF-safe string replacer immune to PowerShell escaping & `&` crashes. | Replaces code blocks cleanly without touching surrounding lines | **Sub-2ms** |
-| **`fullstack_audit`** | Refreshes and updates the entire architecture atlas in `docs/`. | Updates architecture maps after adding new routes or schema tables | **~300ms** |
+| **`fullstack_patch_apply`** | Atomic unified diff patcher. Sends only changed lines + context instead of full files. | Applies standard unified diffs with atomic rollback on mismatch (74x token savings) | **Sub-2ms** |
+| **`fullstack_batch_replace`** | 1-turn high-speed batch token, color, and string replacer across multiple files. | *"Swap brand hex `#4f46e5` to `#06b6d4` across all components"* | **Sub-10ms** |
+| **`fullstack_reference`** | Reference pattern cataloger and mechanism lookup across open-source reference repos. | *"Look up reference patterns for subtitle parsing"* | **Sub-3ms** |
+| **`fullstack_audit`** | Refreshes and updates the entire architecture atlas in `docs/` (frontend, backend, adaptive). | Updates architecture maps after adding new routes, schema tables, or extensions | **~300ms** |
 
 ---
 
 ## Fast CLI Utilities & Hybrid Code RAG
 
+* **`npx fullstack-audit --adaptive`**: Runs the Adaptive Domain Sniffer for Chrome Extensions, Bots, CLIs, Tailwind v4, 3D Canvas, and Vanilla Web.
+* **`npx fullstack-audit --reference [dir]`**: Catalogs open-source reference repos in `docs/cloned-repos/` for 0ms mechanism retrieval.
+* **`npx fullstack-audit --patch-apply <file> [--diff-content <diff>]`**: Applies a unified diff atomically with temporary file rollback.
+* **`npx fullstack-audit --swap-token <old> --to <new> [--dry-run]`**: 1-turn mass token/color replacer across all files.
 * **`npx fullstack-audit --rag "<query>"`**: Hybrid Code RAG combining BM25, sub-word tokenization, domain synonyms, and 1-hop causal bundle retrieval in <1.5ms.
 * **`npx fullstack-audit --doctor`**: Automated health check verifying Node.js, MCP daemon, Iron Gate hooks, and 10 IDE harness configurations.
 * **`npx fullstack-audit --roi`**: Live developer ROI card tracking tokens, dollar savings, and AMSI Defender latency saved.
@@ -155,19 +162,17 @@ Running Fullstack Audit documents your codebase architecture neatly inside `docs
 
 ```text
 docs/
-|-- frontend-atlas/
-|   |-- 01_ROUTES_AND_PANELS_MAP.md         # Route hierarchy, layouts, RSC [Server]/[Client] boundaries
-|   |-- 02_COMPONENT_INVENTORY.md           # Triggers, modals, live pulse dots, capsule pills
-|   |-- 03_DESIGN_TOKENS_AND_COLORS.md      # Tailwind color matrix & dark mode asymmetries
-|   |-- 04_UI_ISLANDS_AND_DRIFT.md          # UI drift analysis & styling consolidation targets
-|   |-- 05_DEAD_ORPHANED_COMPONENTS.md      # Unused component audit & safe removal guide
-|   |-- 06_VISIBLE_TEXT_AND_LABELS_MAP.md   # Screenshot-to-code text index (buttons, CTAs, headings)
-|   |-- 07_VISUAL_AND_ICON_INDEX.md         # Action icon index with interactive context
-|   |-- 08_DISPATCH_GATEWAY.md              # Agent triage matrix & tool routing table
-|   |-- 09_QUERY_AND_CACHE_MAP.md           # TanStack React Query cache keys & invalidations
-|   |-- 10_GOD_FILES_SURGICAL_MAP.md        # AST line slices for monolithic files (>500 lines)
-|   |-- 11_ROUTE_COMPLEXITY_AND_BLAST_RADIUS.md # Risk scoring (0-100) & blast radius tiers
-|   `-- 12_TEST_SUITES_AND_COVERAGE_MAP.md  # Test suite index & assertion map
+|-- frontend-atlas/                         # Web routes, components, design tokens, query keys, test suites
+|-- backend-atlas/                          # APIs, Prisma/Drizzle schemas, server actions, auth guards, webhooks
+|-- adaptive-atlas/                         # Auto-discovered non-standard domains (Extensions, Bots, CLIs, 3D)
+|   |-- 01_EXTENSION_MANIFEST_MAP.md       # Chrome Extension Manifest v3/v2, workers, content scripts
+|   |-- 02_WEBSOCKET_BOT_CATALOG.md         # Realtime dispatchers (@mtcute, ws, socket.io)
+|   |-- 03_CLI_PIPELINE_CATALOG.md          # CLI binaries, scripts, FFmpeg pipelines
+|   |-- 04_TAILWIND_V4_THEME_CATALOG.md     # Tailwind v4 @theme CSS custom properties
+|   |-- 05_3D_CANVAS_CATALOG.md             # Three.js 3D meshes, canvases, render loops
+|   `-- 06_VANILLA_WEB_CATALOG.md           # Static HTML, CSS links, unbundled JS
+`-- reference-atlas/
+    `-- 00_REFERENCE_PATTERNS.md            # Proven patterns and mechanisms from reference repositories
 `-- backend-atlas/
     |-- 01_API_ROUTES_AND_ENDPOINTS.md      # HTTP API routes, methods, auth guards
     |-- 02_DATABASE_MODELS_AND_SCHEMA.md    # Prisma, Drizzle, and Raw SQL table models

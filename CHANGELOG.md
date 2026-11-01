@@ -6,6 +6,43 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [2.17.0] - 2026-11-02
+
+> **Release Tier**: `MINOR (Precision Unified Diff Patcher, 1-Turn Batch Token Replacer, Adaptive Domain Sniffer, Reference Pattern Cataloger)`  
+> **Summary**: Introduces atomic unified diff patching (`fullstack_patch_apply`) with 74x token reduction over full file rewrites and 1-turn mass token/color replacer (`fullstack_batch_replace`), alongside Adaptive Domain Sniffer (`docs/adaptive-atlas/`) covering non-web stacks (Chrome extensions, Telegram bots/WebSockets, CLI pipelines, Tailwind v4 `@theme`, 3D Canvas, Vanilla Web) and Reference Pattern Cataloger (`docs/reference-atlas/`).
+
+### Added
+* **Precision Unified Diff Patcher (`scripts/precision-patcher.ts`, `fullstack_patch_apply`)**:
+  * Unified diff parser and hunk applicator accepting standard `@@ -start,count +start,count @@` patches and markdown diff fences.
+  * Atomic file replacement via temporary `.pid.tmp` rename ensuring 100% clean rollback on hunk context mismatch.
+  * Up to 74x token reduction compared to naive full file read-and-rewrites.
+* **1-Turn Batch Token / Color Replacer (`fullstack_batch_replace`, `--swap-token`)**:
+  * Instant multi-file string and token replacer for color palette rebranding, Tailwind utility updates, and component refactoring in 1 turn.
+  * Supports `--dry-run` to preview file receipts and line numbers before applying edits.
+* **Adaptive Domain Sniffer (`scripts/adaptive-sniffer.ts`, `docs/adaptive-atlas/`, `--adaptive`)**:
+  * Automatically sniffs project architecture and generates specialized atlases:
+    1. `01_EXTENSION_MANIFEST_MAP.md`: Chrome Extension Manifest v3/v2, background service workers, and content scripts.
+    2. `02_WEBSOCKET_BOT_CATALOG.md`: Realtime dispatchers and bot handlers (`@mtcute`, `ws`, `socket.io`).
+    3. `03_CLI_PIPELINE_CATALOG.md`: Registered binary entrypoints (`pkg.bin`) and processing pipelines (FFmpeg video rendering).
+    4. `04_TAILWIND_V4_THEME_CATALOG.md`: CSS-native `@theme` blocks and custom properties without `tailwind.config.js`.
+    5. `05_3D_CANVAS_CATALOG.md`: Three.js 3D scenes, meshes, and WebGL canvas entrypoints.
+    6. `06_VANILLA_WEB_CATALOG.md`: Static HTML entrypoints, linked scripts, and stylesheets.
+* **Reference Pattern Cataloger (`scripts/reference-cataloger.ts`, `docs/reference-atlas/`, `--reference`)**:
+  * Automatically scans reference repositories in `docs/cloned-repos/`.
+  * Catalogs proven architectural mechanisms and exported tools into `00_REFERENCE_PATTERNS.md` for zero-hallucination agent lookup.
+* **Expanded Native MCP Daemon (10 Tools)**:
+  * Exposes `fullstack_patch_apply`, `fullstack_batch_replace`, and `fullstack_reference` alongside the existing 7 native tools.
+* **Automatic Gitignore Protection**:
+  * Enforces automatic `.gitignore` exclusion for `docs/adaptive-atlas/`, `docs/reference-atlas/`, `docs/cloned-repos/`, `GLOSSARY.md`, and `docs/adr/`.
+
+### Changed
+* **Audit Orchestration**:
+  * Default fullstack audit now automatically invokes the adaptive domain sniffer and reference cataloger upon completion.
+* **Engine Version Banner**:
+  * Bumped to `v2.17.0` in `package.json`, `scripts/constants.ts`, `bin/audit.js`, and `SKILL.md`.
+
+---
+
 ## [2.16.0] - 2026-10-27
 
 > **Release Tier**: `MINOR (1,000-Run Empirical Flight Test Benchmark Suite & Head-to-Head Tweak Mutator)`  

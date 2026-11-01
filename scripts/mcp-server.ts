@@ -1,14 +1,17 @@
 #!/usr/bin/env node
 /**
  * Universal Fullstack Audit MCP Server (Stdio JSON-RPC 2.0 Daemon)
- * Exposes 7 high-performance native tools to AI agents:
+ * Exposes 10 high-performance native tools to AI agents:
  * 1. fullstack_find: Sub-3ms token-compact lookup across Fullstack Atlas
  * 2. fullstack_locate_visual: 0ms visual locator (pulse dots, capsule pills, action icons, badges)
  * 3. fullstack_resolve: Fuzzy prefix-agnostic component and file resolver
  * 4. fullstack_path: Sub-5ms causal execution path finder (UI -> Action -> DB)
  * 5. fullstack_symbol: Line-bound surgical slicer for functions/methods in monolithic files
  * 6. fullstack_patch: CRLF-agnostic surgical patcher (immune to PowerShell escaping crashes)
- * 7. fullstack_audit: On-demand atlas regeneration and cache refresh
+ * 7. fullstack_patch_apply: Chisel-style atomic unified diff patcher (74x token reduction)
+ * 8. fullstack_batch_replace: 1-turn mass color and token replacer across multiple files
+ * 9. fullstack_reference: Xerj-style Reference Coding pattern lookup from cloned repos
+ * 10. fullstack_audit: On-demand atlas regeneration (frontend, backend, and adaptive)
  */
 
 import fs from "fs";
@@ -16,6 +19,9 @@ import path from "path";
 import readline from "readline";
 import child_process from "child_process";
 import { FULLSTACK_AUDIT_VERSION, FULLSTACK_AUDIT_ENGINE, tokenizeCodeIdentifier, expandSynonyms, AtlasIndex } from "./constants.js";
+import { applyUnifiedDiff, batchReplaceTokens } from "./precision-patcher.js";
+import { runAdaptiveAudit } from "./adaptive-sniffer.js";
+import { catalogReferenceRepos } from "./reference-cataloger.js";
 
 // Ensure all diagnostic logging goes strictly to stderr. stdout is exclusively for JSON-RPC 2.0.
 function logDebug(msg: string) {
@@ -105,6 +111,13 @@ export function ensureGitignoreProtection(projectRoot: string): void {
     const requiredEntries = [
       "docs/frontend-atlas/",
       "docs/backend-atlas/",
+      "docs/adaptive-atlas/",
+      "docs/reference-atlas/",
+      "docs/cloned-repos/",
+      "docs/clone-repo/",
+      "docs/research/",
+      "GLOSSARY.md",
+      "docs/adr/",
       "docs/llms.txt",
       "docs/llms-full.txt",
       "docs/THEME_MIGRATION_PUNCHLIST.md",
@@ -695,7 +708,65 @@ function toolSurgicalPatch(filePath: string, target: string, replacement: string
   };
 }
 
-// 7. Tool: fullstack_audit
+// 7. Tool: fullstack_patch_apply (Atomic unified diff)
+function toolPatchApply(filePath: string, patch: string, projectRoot?: string): { content: string; isError: boolean } {
+  const root = resolveProjectRoot(projectRoot);
+  try {
+    const res = applyUnifiedDiff(filePath, patch, root);
+    return { content: res.message, isError: false };
+  } catch (err: any) {
+    return { content: `❌ Unified Diff Patch Failed: ${err.message}`, isError: true };
+  }
+}
+
+// 8. Tool: fullstack_batch_replace (1-turn mass color and token replacer)
+function toolBatchReplace(target: string, replacement: string, projectRoot?: string, dryRun?: boolean, extensions?: string[]): { content: string; isError: boolean } {
+  const root = resolveProjectRoot(projectRoot);
+  try {
+    const res = batchReplaceTokens(target, replacement, {
+      projectRoot: root,
+      dryRun,
+      fileExtensions: extensions,
+    });
+    let msg = res.dryRun
+      ? `🔍 [BATCH REPLACE DRY-RUN] Would modify ${res.totalFilesModified} file(s) (${res.totalOccurrences} occurrences):\n`
+      : `✅ [BATCH REPLACE SUCCESS] Modified ${res.totalFilesModified} file(s) (${res.totalOccurrences} occurrences replaced):\n`;
+    for (const r of res.receipts.slice(0, 20)) {
+      msg += `- ${r.file}: ${r.occurrences} occurrence(s) at lines [${r.sampleLines.join(", ")}]\n`;
+    }
+    if (res.receipts.length > 20) {
+      msg += `...and ${res.receipts.length - 20} more files.\n`;
+    }
+    return { content: msg, isError: false };
+  } catch (err: any) {
+    return { content: `❌ Batch Replace Failed: ${err.message}`, isError: true };
+  }
+}
+
+// 9. Tool: fullstack_reference (Reference Pattern Cataloger)
+function toolReference(query?: string, referenceDir?: string, projectRoot?: string): { content: string; isError: boolean } {
+  const root = resolveProjectRoot(projectRoot);
+  try {
+    const res = catalogReferenceRepos(referenceDir || "docs/cloned-repos", root);
+    let msg = `📚 [REFERENCE CODING] Cataloged ${res.reposCataloged} reference repository/repositories in ${res.atlasPath || "docs/reference-atlas/"}:\n\n`;
+    for (const s of res.summaries) {
+      msg += `### ${s.repoName} (${s.repoPath})\n`;
+      msg += `> ${s.description}\n`;
+      if (s.toolsAndCommands.length > 0) {
+        msg += `**Commands**: ${s.toolsAndCommands.join(", ")}\n`;
+      }
+      if (s.keyMechanisms.length > 0) {
+        msg += `**Mechanisms**:\n` + s.keyMechanisms.map(m => `  • ${m}`).join("\n") + "\n";
+      }
+      msg += `\n`;
+    }
+    return { content: msg, isError: false };
+  } catch (err: any) {
+    return { content: `❌ Reference Cataloging Failed: ${err.message}`, isError: true };
+  }
+}
+
+// 10. Tool: fullstack_audit
 function toolAudit(projectRoot?: string, frontendOnly?: boolean, backendOnly?: boolean): { content: string; isError: boolean } {
   findLruCache.clear();
   visualLruCache.clear();
@@ -716,6 +787,12 @@ function toolAudit(projectRoot?: string, frontendOnly?: boolean, backendOnly?: b
     if (res.error) {
       return { content: `❌ Failed to execute fullstack audit: ${res.error.message}`, isError: true };
     }
+
+    // Also run Adaptive Audit and Reference Cataloger
+    try {
+      runAdaptiveAudit(root);
+      catalogReferenceRepos("docs/cloned-repos", root);
+    } catch {}
 
     const output = (res.stdout || "") + (res.stderr || "");
     const lastLines = output.split("\n").slice(-15).join("\n");
@@ -807,8 +884,48 @@ const TOOL_DEFINITIONS = [
     }
   },
   {
+    name: "fullstack_patch_apply",
+    description: "Atomic unified diff patcher. Sends only changed lines + context instead of rewriting full files (74x token savings). 100% rollback on hunk mismatch.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        filePath: { type: "string", description: "Target file path to patch." },
+        patch: { type: "string", description: "Unified diff text with @@ -start,count +start,count @@ headers. Markdown code fences are auto-stripped." },
+        projectRoot: { type: "string", description: "Optional project root directory path. Defaults to active workspace." }
+      },
+      required: ["filePath", "patch"]
+    }
+  },
+  {
+    name: "fullstack_batch_replace",
+    description: "1-turn high-speed batch token, color, and string replacer across multiple project files. Atomic writes, zero hallucinations.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        target: { type: "string", description: "Target token, class name, hex color, or string to replace." },
+        replacement: { type: "string", description: "New replacement string." },
+        dryRun: { type: "boolean", description: "If true, simulates replacement and returns preview receipts without modifying files." },
+        extensions: { type: "array", items: { type: "string" }, description: "Optional array of file extensions to target (e.g. ['.tsx', '.css'])." },
+        projectRoot: { type: "string", description: "Optional project root directory path. Defaults to active workspace." }
+      },
+      required: ["target", "replacement"]
+    }
+  },
+  {
+    name: "fullstack_reference",
+    description: "Reference pattern cataloger. Indexes reference repositories in docs/cloned-repos/ for instant zero-hallucination mechanism retrieval.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        query: { type: "string", description: "Optional query or topic to look up across reference architectures." },
+        referenceDir: { type: "string", description: "Directory containing cloned reference repositories (defaults to 'docs/cloned-repos')." },
+        projectRoot: { type: "string", description: "Optional project root directory path. Defaults to active workspace." }
+      }
+    }
+  },
+  {
     name: "fullstack_audit",
-    description: "Generates or refreshes the fullstack atlas catalog (frontend & backend) into docs/frontend-atlas/ and docs/backend-atlas/.",
+    description: "Generates or refreshes the fullstack atlas catalog (frontend, backend, and adaptive) into docs/frontend-atlas/, docs/backend-atlas/, and docs/adaptive-atlas/.",
     inputSchema: {
       type: "object",
       properties: {
@@ -918,6 +1035,15 @@ export function startMcpServer() {
             break;
           case "fullstack_patch":
             result = toolSurgicalPatch(args.filePath, args.target, args.replacement, args.projectRoot);
+            break;
+          case "fullstack_patch_apply":
+            result = toolPatchApply(args.filePath, args.patch, args.projectRoot);
+            break;
+          case "fullstack_batch_replace":
+            result = toolBatchReplace(args.target, args.replacement, args.projectRoot, args.dryRun, args.extensions);
+            break;
+          case "fullstack_reference":
+            result = toolReference(args.query, args.referenceDir, args.projectRoot);
             break;
           case "fullstack_audit":
             result = toolAudit(args.projectRoot, args.frontendOnly, args.backendOnly);

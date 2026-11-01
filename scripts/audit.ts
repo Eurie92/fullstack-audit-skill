@@ -5,6 +5,9 @@ import os from "os";
 import child_process from "child_process";
 import ts from "typescript";
 import { runUniversalBackendAudit } from "./audit-backend.js";
+import { applyUnifiedDiff, batchReplaceTokens } from "./precision-patcher.js";
+import { runAdaptiveAudit } from "./adaptive-sniffer.js";
+import { catalogReferenceRepos } from "./reference-cataloger.js";
 import {
   FULLSTACK_AUDIT_VERSION,
   FULLSTACK_AUDIT_ENGINE,
@@ -98,6 +101,19 @@ const GRAPH_MODE = ARGS.includes("--graph");
 const SOLO_MODE = ARGS.includes("--solo") || (!ARGS.includes("--multi-agent") && !ARGS.includes("--parallel") && !ARGS.includes("--zones"));
 const MULTI_AGENT_MODE = ARGS.includes("--multi-agent") || ARGS.includes("--parallel") || ARGS.includes("--zones");
 const DIFF_MODE = ARGS.includes("--diff");
+
+const PATCH_APPLY_MODE = ARGS.includes("--patch-apply");
+const PATCH_APPLY_FILE = PATCH_APPLY_MODE ? ARGS[ARGS.indexOf("--patch-apply") + 1] : undefined;
+const DIFF_INPUT = ARGS.includes("--diff-content") ? ARGS[ARGS.indexOf("--diff-content") + 1] : undefined;
+
+const SWAP_TOKEN_MODE = ARGS.includes("--swap-token") || ARGS.includes("--replace-all");
+const SWAP_FROM = SWAP_TOKEN_MODE ? ARGS[ARGS.indexOf(ARGS.includes("--swap-token") ? "--swap-token" : "--replace-all") + 1] : undefined;
+const SWAP_TO = ARGS.includes("--to") ? ARGS[ARGS.indexOf("--to") + 1] : (ARGS.includes("--with") ? ARGS[ARGS.indexOf("--with") + 1] : undefined);
+
+const REFERENCE_MODE = ARGS.includes("--reference") || ARGS.includes("--reference-repos");
+const REFERENCE_DIR = REFERENCE_MODE ? (ARGS[ARGS.indexOf(ARGS.includes("--reference") ? "--reference" : "--reference-repos") + 1] || "docs/cloned-repos") : undefined;
+
+const ADAPTIVE_MODE = ARGS.includes("--adaptive");
 
 export type SupportedFramework =
   | "Next.js (App Router)"
@@ -6752,6 +6768,13 @@ function ensureGitignoreEntries(rootDir: string) {
     const required = [
       "docs/frontend-atlas/",
       "docs/backend-atlas/",
+      "docs/adaptive-atlas/",
+      "docs/reference-atlas/",
+      "docs/cloned-repos/",
+      "docs/clone-repo/",
+      "docs/research/",
+      "GLOSSARY.md",
+      "docs/adr/",
       "docs/graph.json",
       "docs/llms.txt",
       "docs/llms-full.txt",
@@ -6805,6 +6828,64 @@ async function main() {
   if (UPDATE_MODE) {
     await executeSelfUpdate();
     return;
+  }
+
+  // Atomic Unified Diff Patching Engine
+  if (PATCH_APPLY_MODE) {
+    if (!PATCH_APPLY_FILE) {
+      console.error("❌ Error: --patch-apply requires a target file path. Usage: npx fullstack-audit --patch-apply <file> [--diff-content <diff>]");
+      process.exit(1);
+    }
+    let patchContent = DIFF_INPUT;
+    if (!patchContent) {
+      try {
+        patchContent = fs.readFileSync(0, "utf-8"); // stdin
+      } catch {}
+    }
+    if (!patchContent) {
+      console.error("❌ Error: No unified diff provided via --diff-content or stdin.");
+      process.exit(1);
+    }
+    try {
+      const res = applyUnifiedDiff(PATCH_APPLY_FILE, patchContent, ROOT_DIR);
+      console.log(res.message);
+      process.exit(0);
+    } catch (err: any) {
+      console.error(`❌ ${err.message}`);
+      process.exit(1);
+    }
+  }
+
+  // 1-Turn Batch Token / Color Swapper
+  if (SWAP_TOKEN_MODE) {
+    if (!SWAP_FROM || !SWAP_TO) {
+      console.error("❌ Error: --swap-token requires target and replacement. Usage: npx fullstack-audit --swap-token <old> --to <new> [--dry-run]");
+      process.exit(1);
+    }
+    const res = batchReplaceTokens(SWAP_FROM, SWAP_TO, { projectRoot: ROOT_DIR, dryRun: DRY_RUN_MODE });
+    if (res.dryRun) {
+      console.log(`🔍 [BATCH REPLACE DRY-RUN] Would modify ${res.totalFilesModified} file(s) (${res.totalOccurrences} occurrences):`);
+    } else {
+      console.log(`✅ [BATCH REPLACE SUCCESS] Modified ${res.totalFilesModified} file(s) (${res.totalOccurrences} occurrences replaced):`);
+    }
+    res.receipts.forEach(r => console.log(`   └─ ${r.file}: ${r.occurrences} occurrence(s) at lines [${r.sampleLines.join(", ")}]`));
+    process.exit(0);
+  }
+
+  // Reference Pattern Cataloger
+  if (REFERENCE_MODE) {
+    const res = catalogReferenceRepos(REFERENCE_DIR || "docs/cloned-repos", ROOT_DIR);
+    console.log(`📚 [REFERENCE CODING] Cataloged ${res.reposCataloged} reference repository/repositories in ${res.atlasPath}`);
+    res.summaries.forEach(s => console.log(`   └─ ${s.repoName}: ${s.description}`));
+    process.exit(0);
+  }
+
+  // Adaptive Domain Sniffer
+  if (ADAPTIVE_MODE) {
+    const res = runAdaptiveAudit(ROOT_DIR);
+    console.log(`🧩 [ADAPTIVE ATLAS] Auto-discovered ${res.detectedDomains.length} non-standard domain(s):`);
+    res.generatedAtlases.forEach(a => console.log(`   └─ ${a}`));
+    process.exit(0);
   }
 
   if (PATCH_MODE) {
@@ -6868,6 +6949,19 @@ async function main() {
     if (res && LLMS_MODE) {
       generateLlmsStandardFiles(res.routeMaps, res.structure);
     }
+
+    // Adaptive Domain Sniffer & Reference Cataloger
+    try {
+      const adaptiveRes = runAdaptiveAudit(ROOT_DIR);
+      if (adaptiveRes.generatedAtlases.length > 0) {
+        console.log(`\n🧩 [ADAPTIVE ATLAS] Auto-discovered ${adaptiveRes.detectedDomains.length} non-standard domain(s):`);
+        adaptiveRes.generatedAtlases.forEach(a => console.log(`   └─ ${a}`));
+      }
+      const refRes = catalogReferenceRepos("docs/cloned-repos", ROOT_DIR);
+      if (refRes.reposCataloged > 0) {
+        console.log(`\n📚 [REFERENCE CODING] Cataloged ${refRes.reposCataloged} reference repository/repositories in ${refRes.atlasPath}`);
+      }
+    } catch {}
   }
 
   if (WATCH_MODE) {

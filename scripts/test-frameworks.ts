@@ -8,6 +8,9 @@ import fs from "fs";
 import path from "path";
 import child_process from "child_process";
 import { ensureGitignoreProtection } from "./mcp-server.js";
+import { applyUnifiedDiff, batchReplaceTokens } from "./precision-patcher.js";
+import { runAdaptiveAudit } from "./adaptive-sniffer.js";
+import { catalogReferenceRepos } from "./reference-cataloger.js";
 
 const TEST_DIR = path.join(process.cwd(), ".tmp-test-frameworks");
 
@@ -741,6 +744,81 @@ async function runTestMatrix() {
     assert(atlasIndexRaw.version === pkg.version, `.atlas-index.json has version v${pkg.version}`);
     assert(atlasIndexRaw.causalGraph !== undefined, ".atlas-index.json contains pre-computed causalGraph");
     assert(Array.isArray(atlasIndexRaw.causalGraph.nodes), "causalGraph contains nodes array");
+
+    // ============================================================
+    // Test 14: Precision Patcher, Batch Replacer, Adaptive Sniffer, & Reference Cataloger (v2.17.0)
+    // ============================================================
+    console.log("\n▶️ Test 14: Precision Patcher, Batch Replacer, Adaptive Sniffer, & Reference Cataloger (v2.17.0)");
+
+    const testAppDir = path.join(TEST_DIR, "hybrid-app");
+    fs.mkdirSync(testAppDir, { recursive: true });
+
+    // 14.1: Unified diff patch application (Atomic diffing)
+    const originalFile = path.join(testAppDir, "sample.tsx");
+    fs.writeFileSync(originalFile, "export function Header() {\n  return (\n    <h1 className=\"text-red-500\">Old Title</h1>\n  );\n}\n");
+
+    const patchText = `--- a/sample.tsx
++++ b/sample.tsx
+@@ -2,3 +2,3 @@
+   return (
+-    <h1 className="text-red-500">Old Title</h1>
++    <h1 className="text-blue-600 font-bold">New Title</h1>
+   );`;
+
+    const patchResult = applyUnifiedDiff(originalFile, patchText, testAppDir);
+    assert(patchResult.success === true, "Unified diff applied successfully");
+    const patchedContent = fs.readFileSync(originalFile, "utf-8");
+    assert(patchedContent.includes("text-blue-600 font-bold"), "Patched file contains new hunk content");
+    assert(!patchedContent.includes("text-red-500"), "Old content cleanly removed");
+
+    // 14.2: Atomic rollback on hunk mismatch
+    const badPatchText = `--- a/sample.tsx
++++ b/sample.tsx
+@@ -10,3 +10,3 @@
+   nonExistentContextLine();
+-    wrongLine();
++    newLine();`;
+
+    let failedAsExpected = false;
+    try {
+      applyUnifiedDiff(originalFile, badPatchText, testAppDir);
+    } catch {
+      failedAsExpected = true;
+    }
+    assert(failedAsExpected === true, "Mismatched hunk throws error and aborts");
+    assert(fs.readFileSync(originalFile, "utf-8") === patchedContent, "Original file is untouched on patch failure");
+
+    // 14.3: Batch Token Replacer
+    const comp1 = path.join(testAppDir, "Comp1.tsx");
+    const comp2 = path.join(testAppDir, "Comp2.tsx");
+    fs.writeFileSync(comp1, "const color = '#4f46e5';");
+    fs.writeFileSync(comp2, "const theme = { primary: '#4f46e5' };");
+
+    const batchRes = batchReplaceTokens("#4f46e5", "#06b6d4", { projectRoot: testAppDir });
+    assert(batchRes.totalFilesModified === 2, "Batch replace modified 2 files in 1 turn");
+    assert(batchRes.totalOccurrences === 2, "Batch replace swapped 2 occurrences");
+    assert(fs.readFileSync(comp1, "utf-8").includes("#06b6d4"), "Comp1 updated with new token");
+    assert(fs.readFileSync(comp2, "utf-8").includes("#06b6d4"), "Comp2 updated with new token");
+
+    // 14.4: Adaptive Domain Sniffer (Extension, WebSocket/Bot, CLI, Tailwind v4, Three.js)
+    const extAppDir = path.join(TEST_DIR, "extension-app");
+    fs.mkdirSync(extAppDir, { recursive: true });
+    fs.writeFileSync(path.join(extAppDir, "manifest.json"), JSON.stringify({
+      manifest_version: 3,
+      name: "Test Extension Flow",
+      version: "1.0.0",
+      permissions: ["storage", "tabs"],
+      background: { service_worker: "background.js" }
+    }));
+
+    const adaptiveExt = runAdaptiveAudit(extAppDir);
+    assert(adaptiveExt.detectedDomains.length >= 1, "Adaptive sniffer detected Chrome Extension domain");
+    assert(fs.existsSync(path.join(extAppDir, "docs", "adaptive-atlas", "01_EXTENSION_MANIFEST_MAP.md")), "Generated 01_EXTENSION_MANIFEST_MAP.md");
+
+    // 14.5: Reference Cataloger
+    const refRes = catalogReferenceRepos("docs/cloned-repos", process.cwd());
+    assert(refRes.reposCataloged === 2, "Reference cataloger indexed reference repositories");
+    assert(fs.existsSync(path.join(process.cwd(), "docs", "reference-atlas", "00_REFERENCE_PATTERNS.md")), "Generated 00_REFERENCE_PATTERNS.md");
 
     console.log(`\n============================================================`);
     console.log(`🎉 Test Matrix Complete: ${passedTests}/${totalTests} Passed (100% Success)`);

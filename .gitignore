@@ -30,3 +30,20 @@ docs/llms-full.txt
 docs/THEME_MIGRATION_PUNCHLIST.md
 RELEASE_NOTES_*.md
 release-notes-*.md
+
+# Fullstack Audit local architecture maps & benchmarks (AI navigation only)
+scripts/benchmark-*.ts
+
+# Cloned External Repositories for Audit / Reference
+docs/cloned-repos/
+docs/clone-repo/
+
+# Grilling with Docs & ADR local artifacts
+GLOSSARY.md
+docs/adr/
+
+
+# Fullstack Audit local architecture maps (AI navigation only)
+docs/adaptive-atlas/
+docs/reference-atlas/
+docs/research/

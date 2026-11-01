@@ -1,7 +1,7 @@
 ---
 name: fullstack-audit
-description: Runs the automated universal fullstack atlas and design system catalog engine into docs/frontend-atlas/ and docs/backend-atlas/. Supports Next.js (App & Pages Router), Vite React SPAs, Nuxt 3, SvelteKit, Astro, Remix, and React Router v7. Catalogs frontend routes, ghost/redirect shims, buttons, live pulse dots, capsule pills, modals, and design tokens, maps TanStack React Query cache topology, indexes test suites, and audits backend API routes, domain services, Prisma/Drizzle/Raw SQL schemas, server actions, auth guards, webhooks, and Answer.AI llms.txt standard.
-version: 2.16.0
+description: Runs the automated universal fullstack atlas and design system catalog engine into docs/frontend-atlas/, docs/backend-atlas/, and docs/adaptive-atlas/. Supports Next.js (App & Pages Router), Vite React SPAs, Nuxt 3, SvelteKit, Astro, Remix, React Router v7, Chrome Extensions, Telegram Bots/WebSockets, CLI pipelines, Tailwind v4, 3D Canvas, and Vanilla Web. Catalogs frontend routes, design tokens, modals, API routes, database schemas, and incorporates atomic unified diff patching and automated Reference Pattern cataloging.
+version: 2.17.0
 allowed-tools:
   - run_command
   - Bash(npx tsx .agent/skills/fullstack-audit/scripts/audit.ts)
@@ -119,7 +119,7 @@ Works seamlessly across **Antigravity, Cursor, Claude Code, Windsurf, Codex, and
 12. **`12_TEST_SUITES_AND_COVERAGE_MAP.md`**: Pre-indexed registry of unit, integration, and E2E test suites. Eliminates blind directory greps on test assertion failures.
 13. **`THEME_MIGRATION_PUNCHLIST.md`**: Actionable `- [ ]` checklist for whole-website color and dark mode migrations.
 
-## Available Commands (v2.16.0 Multi-Harness & Native MCP Engine)
+## Available Commands (v2.17.0 Multi-Harness & Native MCP Engine)
 - **Native MCP Tools (Zero Latency, In-Memory)**:
   - `fullstack_find`: Sub-3ms instant inverted index search across components, queries, test assertions, and database models.
   - `fullstack_locate_visual`: 0ms visual element locator (pulse dots, capsule pills, status badges, icons).
@@ -127,9 +127,16 @@ Works seamlessly across **Antigravity, Cursor, Claude Code, Windsurf, Codex, and
   - `fullstack_path`: Sub-5ms causal execution path finder (UI button -> Action -> DB model).
   - `fullstack_symbol`: Line-bound surgical slicer for functions/methods in God-files (>500 lines).
   - `fullstack_patch`: CRLF-agnostic surgical patcher (immune to PowerShell `&` syntax crashes).
-  - `fullstack_audit`: Runs or refreshes the fullstack atlas catalog in the active project.
+  - `fullstack_patch_apply`: Atomic unified diff patcher (sends only changed hunk lines, 74x token reduction).
+  - `fullstack_batch_replace`: 1-turn mass color and token replacer across multiple files with dry-run support.
+  - `fullstack_reference`: Reference pattern cataloger for zero-hallucination mechanism retrieval.
+  - `fullstack_audit`: Runs or refreshes the fullstack atlas catalog (frontend, backend, and adaptive).
 - **CLI Commands (Terminal & Scripts)**:
   - `/fullstack-audit` or `npm run audit`: Regenerates the entire Fullstack Atlas and root `llms.txt` / `llms-full.txt`.
+  - `npx fullstack-audit --adaptive`: Runs the Adaptive Domain Sniffer for non-web architectures.
+  - `npx fullstack-audit --reference [dir]`: Catalogs open-source reference repos for 0ms pattern lookups.
+  - `npx fullstack-audit --patch-apply <file> [--diff-content <diff>]`: Applies a unified diff atomically.
+  - `npx fullstack-audit --swap-token <old> --to <new> [--dry-run]`: 1-turn mass token/color replacer.
   - `npx fullstack-audit --flight-test`: Runs the 1,000-run empirical flight test & tweak benchmark against active codebase.
   - `npx fullstack-audit --find "<query>" --compact`: Fast-path index query for AI agents (<1ms).
   - `npx fullstack-audit --rag "<query>"`: Hybrid Code RAG retrieval (BM25 + Semantic Vector + 1-Hop Causal Bundle).
