@@ -23,6 +23,7 @@ import { applyUnifiedDiff, batchReplaceTokens } from "./precision-patcher.js";
 import { isInsideRoot } from "../bin/path-contained.js";
 import { runAdaptiveAudit } from "./adaptive-sniffer.js";
 import { catalogReferenceRepos } from "./reference-cataloger.js";
+import { annotateStale } from "./freshness.js";
 // Ensure all diagnostic logging goes strictly to stderr. stdout is exclusively for JSON-RPC 2.0.
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 function logDebug(msg) {
@@ -78,6 +79,10 @@ function getCachedAtlasIndex(indexPath) {
         }
         const raw = fs.readFileSync(indexPath, "utf-8");
         const data = JSON.parse(raw);
+        // Index was regenerated: result caches built from the old one are now wrong.
+        findLruCache.clear();
+        visualLruCache.clear();
+        pathLruCache.clear();
         const files = Array.isArray(data.files) ? data.files : [];
         const entry = { mtime: stat.mtimeMs, data, files };
         indexFileCache.set(indexPath, entry);
@@ -160,8 +165,24 @@ function getFilesRecursively(dir, fileList, maxFiles = 3000) {
     }
     catch { }
 }
-// 1. Tool: fullstack_find
+// Load the index first (a reload clears the result caches), run the lookup, then flag hits whose
+// file changed since the atlas was built. Applied after the cache so cached answers are checked too.
+function withFreshness(projectRoot, run) {
+    const root = resolveProjectRoot(projectRoot);
+    const idx = getCachedAtlasIndex(path.join(root, "docs", "frontend-atlas", ".atlas-index.json"));
+    const r = run();
+    if (r.isError || !idx)
+        return r;
+    return { ...r, content: annotateStale(root, idx.data.fileStamps, r.content) };
+}
 export function toolFind(query, projectRoot, compact = true) {
+    return withFreshness(projectRoot, () => findImpl(query, projectRoot, compact));
+}
+export function toolLocateVisual(query, projectRoot) {
+    return withFreshness(projectRoot, () => locateVisualImpl(query, projectRoot));
+}
+// 1. Tool: fullstack_find
+function findImpl(query, projectRoot, compact = true) {
     const root = resolveProjectRoot(projectRoot);
     const q = (query || "").toLowerCase().trim();
     if (!q) {
@@ -252,7 +273,7 @@ export function toolFind(query, projectRoot, compact = true) {
     }
 }
 // 2. Tool: fullstack_locate_visual
-export function toolLocateVisual(query, projectRoot) {
+function locateVisualImpl(query, projectRoot) {
     const root = resolveProjectRoot(projectRoot);
     const q = (query || "").toLowerCase().trim();
     if (!q) {

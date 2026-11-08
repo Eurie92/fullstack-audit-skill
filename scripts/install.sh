@@ -67,12 +67,12 @@ curl -fsSL "$BASE_URL/SKILL.md" -o "$TARGET_DIR/SKILL.md"
 curl -fsSL "$BASE_URL/scripts/audit.ts" -o "$TARGET_DIR/scripts/audit.ts"
 curl -fsSL "$BASE_URL/scripts/audit-backend.ts" -o "$TARGET_DIR/scripts/audit-backend.ts"
 curl -fsSL "$BASE_URL/scripts/constants.ts" -o "$TARGET_DIR/scripts/constants.ts"
-for f in precision-patcher.ts adaptive-sniffer.ts reference-cataloger.ts; do curl -fsSL "$BASE_URL/scripts/$f" -o "$TARGET_DIR/scripts/$f"; done
+for f in precision-patcher.ts adaptive-sniffer.ts reference-cataloger.ts safe-walk.ts freshness.ts; do curl -fsSL "$BASE_URL/scripts/$f" -o "$TARGET_DIR/scripts/$f"; done
 curl -fsSL "$BASE_URL/bin/audit.js" -o "$TARGET_DIR/bin/audit.js"
 curl -fsSL "$BASE_URL/bin/path-contained.js" -o "$TARGET_DIR/bin/path-contained.js"
 curl -fsSL "$BASE_URL/bin/mcp-server.js" -o "$TARGET_DIR/bin/mcp-server.js"
 mkdir -p "$TARGET_DIR/dist"
-for f in mcp-server constants precision-patcher adaptive-sniffer reference-cataloger; do curl -fsSL "$BASE_URL/dist/$f.js" -o "$TARGET_DIR/dist/$f.js"; done
+for f in mcp-server constants precision-patcher adaptive-sniffer reference-cataloger freshness; do curl -fsSL "$BASE_URL/dist/$f.js" -o "$TARGET_DIR/dist/$f.js"; done
 
 # Construct rule block (same text as generateDynamicRuleBlock in scripts/audit.ts)
 RULE_BLOCK="$(cat <<'RULE_EOF'

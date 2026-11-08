@@ -62,12 +62,20 @@ export interface CausalGraph {
   links: CausalGraphLink[];
 }
 
+export interface FileStamp {
+  mtimeMs: number;
+  size: number;
+  sha1: string;
+}
+
 export interface AtlasIndex {
   version: string;
   engine: string;
   generatedAt: string;
   totalEntries: number;
   files?: string[];
+  /** Per-file fingerprint taken at audit time; queries use it to flag stale hits. */
+  fileStamps?: Record<string, FileStamp>;
   entries: AtlasIndexEntry[];
   causalGraph?: CausalGraph;
 }

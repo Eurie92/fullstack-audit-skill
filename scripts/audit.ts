@@ -9,6 +9,7 @@ import { runUniversalBackendAudit } from "./audit-backend.js";
 import { applyUnifiedDiff, batchReplaceTokens } from "./precision-patcher.js";
 import { isInsideRoot } from "../bin/path-contained.js";
 import { walkFiles } from "./safe-walk.js";
+import { stampFiles } from "./freshness.js";
 import { runAdaptiveAudit } from "./adaptive-sniffer.js";
 import { catalogReferenceRepos } from "./reference-cataloger.js";
 import {
@@ -3903,6 +3904,7 @@ function buildAndSaveAtlasIndex(
     generatedAt: new Date().toISOString(),
     totalEntries: entries.length,
     files: indexedFiles,
+    fileStamps: stampFiles(ROOT_DIR, indexedFiles),
     entries,
     causalGraph: backendCausalGraph,
   };

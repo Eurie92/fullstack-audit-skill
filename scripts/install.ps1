@@ -67,7 +67,7 @@ Invoke-WebRequest -Uri "$BaseUrl/SKILL.md" -OutFile (Join-Path $TargetDir "SKILL
 Invoke-WebRequest -Uri "$BaseUrl/scripts/audit.ts" -OutFile (Join-Path $ScriptsDir "audit.ts")
 Invoke-WebRequest -Uri "$BaseUrl/scripts/audit-backend.ts" -OutFile (Join-Path $ScriptsDir "audit-backend.ts")
 Invoke-WebRequest -Uri "$BaseUrl/scripts/constants.ts" -OutFile (Join-Path $ScriptsDir "constants.ts")
-foreach ($f in @("precision-patcher.ts", "adaptive-sniffer.ts", "reference-cataloger.ts")) {
+foreach ($f in @("precision-patcher.ts", "adaptive-sniffer.ts", "reference-cataloger.ts", "safe-walk.ts", "freshness.ts")) {
     Invoke-WebRequest -Uri "$BaseUrl/scripts/$f" -OutFile (Join-Path $ScriptsDir $f)
 }
 
@@ -79,7 +79,7 @@ Invoke-WebRequest -Uri "$BaseUrl/bin/mcp-server.js" -OutFile (Join-Path $BinDir 
 
 $DistDir = Join-Path $TargetDir "dist"
 if (-not (Test-Path $DistDir)) { New-Item -ItemType Directory -Force -Path $DistDir | Out-Null }
-foreach ($f in @("mcp-server", "constants", "precision-patcher", "adaptive-sniffer", "reference-cataloger")) {
+foreach ($f in @("mcp-server", "constants", "precision-patcher", "adaptive-sniffer", "reference-cataloger", "freshness")) {
     Invoke-WebRequest -Uri "$BaseUrl/dist/$f.js" -OutFile (Join-Path $DistDir "$f.js")
 }
 
