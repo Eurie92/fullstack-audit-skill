@@ -70,15 +70,16 @@ function armSetup(arm, dir) {
 
 function claudeArgs(prompt, arm, extra) {
   // Isolation: only project settings (user plugins/hooks/CLAUDE.md stay out), no skills, MCP only what we pass.
-  return ["-p", prompt, "--output-format", "stream-json", "--verbose", "--model", model,
+  return ["-p", "--output-format", "stream-json", "--verbose", "--model", model,
     "--max-budget-usd", budget, "--permission-mode", "acceptEdits", "--no-session-persistence",
     "--setting-sources", "project", "--strict-mcp-config", "--disable-slash-commands", ...extra];
 }
 
-function runClaude(argv, cwd) {
+function runClaude(argv, cwd, prompt) {
   return new Promise((resolve) => {
     const t0 = Date.now();
-    const p = spawn("claude", argv, { cwd, shell: process.platform === "win32", stdio: ["ignore", "pipe", "pipe"] });
+    const p = spawn("claude", argv, { cwd, shell: process.platform === "win32", stdio: ["pipe", "pipe", "pipe"] });
+    p.stdin.end(prompt); // prompt via stdin: shell quoting on Windows mangles quotes in args
     let so = "", se = "", killed = false;
     const timer = setTimeout(() => { killed = true; p.kill("SIGKILL"); }, timeoutMs);
     p.stdout.on("data", (d) => (so += d));
@@ -137,7 +138,7 @@ for (const { t, r, arm } of plan) {
   const argv = claudeArgs(t.prompt, arm, co.extra);
   if (dry) { console.log(`claude ${argv.map((x) => JSON.stringify(x)).join(" ")}  (cwd ${co.dir})`); continue; }
   resetCheckout(co.dir);
-  const res = await runClaude(argv, co.dir);
+  const res = await runClaude(argv, co.dir, t.prompt);
   const { tools, result, init } = parseStream(res.so);
   const answer = result?.result || "";
   const u = result?.usage || {};
