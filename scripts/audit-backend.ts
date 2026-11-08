@@ -1,6 +1,7 @@
 import fs from "fs";
 import { walkFiles } from "./safe-walk.js";
 import path from "path";
+import ts from "typescript";
 import { FULLSTACK_AUDIT_VERSION, FULLSTACK_AUDIT_ENGINE, getAtlasProvenanceHeader, AtlasIndexEntry } from "./constants.js";
 
 /**
@@ -600,6 +601,15 @@ export function parseDatabaseModels(files: string[], rootDir: string = ROOT_DIR)
 }
 
 // 3. Static Server Actions Parser ("use server")
+function hasUseServerDirective(body: ts.Node | undefined): boolean {
+  if (!body || !ts.isBlock(body)) return false;
+  for (const st of body.statements) {
+    if (!ts.isExpressionStatement(st) || !ts.isStringLiteral(st.expression)) return false;
+    if (st.expression.text === "use server") return true;
+  }
+  return false;
+}
+
 export function parseServerActions(files: string[], rootDir: string = ROOT_DIR): ServerAction[] {
   const actions: ServerAction[] = [];
 
@@ -607,49 +617,67 @@ export function parseServerActions(files: string[], rootDir: string = ROOT_DIR):
     if (!/\.(tsx|ts|js|jsx)$/.test(filePath)) return;
     const relPath = path.relative(rootDir, filePath).replace(/\\/g, "/");
     const content = fs.readFileSync(filePath, "utf-8");
+    if (!content.includes("use server")) return;
 
-    const hasFileLevelUseServer = /^\s*["']use server["']/m.test(content);
-    const lines = content.split("\n");
+    const sf = ts.createSourceFile(filePath, content, ts.ScriptTarget.Latest, true, /\.(tsx|jsx|js)$/.test(filePath) ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
+    let fileLevel = false;
+    for (const st of sf.statements) {
+      if (!ts.isExpressionStatement(st) || !ts.isStringLiteral(st.expression)) break;
+      if (st.expression.text === "use server") fileLevel = true;
+    }
 
-    lines.forEach((line, idx) => {
-      const lineNum = idx + 1;
-      const trimmed = line.trim();
+    const seen = new Set<ts.Node>();
+    const push = (name: string, fn: ts.FunctionLikeDeclaration, at: ts.Node) => {
+      if (seen.has(fn)) return;
+      seen.add(fn);
+      const text = fn.getText(sf);
+      const dbOperations: string[] = [];
+      if (/prisma\.[a-zA-Z0-9_]+\.(create|update|delete|find|upsert)/.test(text)) dbOperations.push("Prisma ORM");
+      if (/db\.(insert|update|delete|select)/.test(text)) dbOperations.push("Drizzle ORM");
+      const externalServices: string[] = [];
+      if (/stripe\./i.test(text)) externalServices.push("Stripe");
+      if (/resend\./i.test(text)) externalServices.push("Resend");
+      if (/supabase\./i.test(text)) externalServices.push("Supabase");
+      actions.push({
+        name,
+        filePath,
+        relativePath: relPath,
+        line: sf.getLineAndCharacterOfPosition(at.getStart(sf)).line + 1,
+        params: fn.parameters.map(p => p.getText(sf)).join(", ") || "()",
+        dbOperations,
+        externalServices,
+        snippet: text.split("\n")[0].trim().slice(0, 60),
+      });
+    };
+    const isAsync = (n: ts.Node) => !!(ts.canHaveModifiers(n) && ts.getModifiers(n)?.some(m => m.kind === ts.SyntaxKind.AsyncKeyword));
+    const isExported = (n: ts.Node) => !!(ts.canHaveModifiers(n) && ts.getModifiers(n)?.some(m => m.kind === ts.SyntaxKind.ExportKeyword));
 
-      // Check exported async functions
-      const fnMatch = trimmed.match(/export\s+async\s+function\s+([a-zA-Z0-9_]+)\s*\(([^)]*)\)/);
-      if (fnMatch) {
-        const actionName = fnMatch[1];
-        const params = fnMatch[2].trim();
-
-        // Check if file is "use server" or if function body starts with "use server"
-        const nextLines = lines.slice(idx, idx + 5).join(" ");
-        const isAction = hasFileLevelUseServer || /["']use server["']/.test(nextLines);
-
-        if (isAction) {
-          // Detect DB or service operations inside function body
-          const fnBody = lines.slice(idx, Math.min(lines.length, idx + 35)).join("\n");
-          const dbOperations: string[] = [];
-          if (/prisma\.[a-zA-Z0-9_]+\.(create|update|delete|find|upsert)/.test(fnBody)) dbOperations.push("Prisma ORM");
-          if (/db\.(insert|update|delete|select)/.test(fnBody)) dbOperations.push("Drizzle ORM");
-
-          const externalServices: string[] = [];
-          if (/stripe\./i.test(fnBody)) externalServices.push("Stripe");
-          if (/resend\./i.test(fnBody)) externalServices.push("Resend");
-          if (/supabase\./i.test(fnBody)) externalServices.push("Supabase");
-
-          actions.push({
-            name: actionName,
-            filePath,
-            relativePath: relPath,
-            line: lineNum,
-            params: params || "()",
-            dbOperations,
-            externalServices,
-            snippet: trimmed.slice(0, 60),
-          });
-        }
+    // Exported async functions and exported async arrow / function-expression consts in "use server" files
+    sf.statements.forEach(st => {
+      if (ts.isFunctionDeclaration(st) && isExported(st) && isAsync(st) && (fileLevel || hasUseServerDirective(st.body))) {
+        push(st.name?.text || "default", st, st);
+      } else if (ts.isVariableStatement(st) && isExported(st)) {
+        st.declarationList.declarations.forEach(d => {
+          let init = d.initializer;
+          while (init && ts.isParenthesizedExpression(init)) init = init.expression;
+          if (init && (ts.isArrowFunction(init) || ts.isFunctionExpression(init)) && isAsync(init) && (fileLevel || hasUseServerDirective(init.body))) {
+            push(d.name.getText(sf), init, d);
+          }
+        });
       }
     });
+
+    // Inline "use server" functions anywhere in the file
+    const visit = (n: ts.Node) => {
+      if ((ts.isFunctionDeclaration(n) || ts.isArrowFunction(n) || ts.isFunctionExpression(n)) && hasUseServerDirective(n.body)) {
+        const p = n.parent;
+        const name = (ts.isFunctionDeclaration(n) && n.name?.text) ||
+          ((ts.isVariableDeclaration(p) || ts.isPropertyAssignment(p)) ? p.name.getText(sf) : "anonymous");
+        push(name, n, n);
+      }
+      ts.forEachChild(n, visit);
+    };
+    visit(sf);
   });
 
   return actions;
@@ -1085,6 +1113,11 @@ export function buildFullstackBridge(
   return bridgeItems;
 }
 
+// Env snippets keep var NAMES only: string literals (inline fallbacks such as `|| "sk-live"`) are blanked, except bracket keys like process.env["X"].
+function redactLiterals(text: string): string {
+  return text.replace(/(?<!\[)(["'`])(?:(?!\1).)*\1/g, "$1…$1");
+}
+
 // 7. Environment Variables & Secret Leak Radar
 export function auditEnvAndSecrets(
   files: string[],
@@ -1144,7 +1177,7 @@ export function auditEnvAndSecrets(
           filePath,
           relativePath: rel,
           line: lineNum,
-          snippet: line.trim().slice(0, 70),
+          snippet: redactLiterals(line.trim()).slice(0, 70),
           isClientScope,
         });
       }

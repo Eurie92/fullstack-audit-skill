@@ -68,6 +68,23 @@ export interface FileStamp {
   sha1: string;
 }
 
+export interface ComponentProp {
+  name: string;
+  type?: string;
+  optional?: boolean;
+}
+
+/** Per-component facts for `fullstack_component`: props, cva variants, how many files use it. */
+export interface ComponentDetail {
+  name: string;
+  file: string;
+  line: number;
+  props: ComponentProp[];
+  /** cva() variant groups, e.g. { size: ["sm", "md"], tone: ["primary", "ghost"] } */
+  variants: Record<string, string[]>;
+  usageCount: number;
+}
+
 export interface AtlasIndex {
   version: string;
   engine: string;
@@ -76,6 +93,7 @@ export interface AtlasIndex {
   files?: string[];
   /** Per-file fingerprint taken at audit time; queries use it to flag stale hits. */
   fileStamps?: Record<string, FileStamp>;
+  components?: ComponentDetail[];
   entries: AtlasIndexEntry[];
   causalGraph?: CausalGraph;
 }

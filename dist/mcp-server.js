@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Universal Fullstack Audit MCP Server (Stdio JSON-RPC 2.0 Daemon)
- * Exposes 10 high-performance native tools to AI agents:
+ * Exposes 12 high-performance native tools to AI agents:
  * 1. fullstack_find: compact lookup across Fullstack Atlas
  * 2. fullstack_locate_visual: visual locator (pulse dots, capsule pills, action icons, badges)
  * 3. fullstack_resolve: Fuzzy prefix-agnostic component and file resolver
@@ -12,6 +12,8 @@
  * 8. fullstack_batch_replace: 1-turn mass color and token replacer across multiple files
  * 9. fullstack_reference: Xerj-style Reference Coding pattern lookup from cloned repos
  * 10. fullstack_audit: On-demand atlas regeneration (frontend, backend, and adaptive)
+ * 11. fullstack_impact: blast radius (reverse dependency walk over the causal graph)
+ * 12. fullstack_component: component props, cva variants and usage count (duplicate check before building)
  */
 import fs from "fs";
 import path from "path";
@@ -24,6 +26,7 @@ import { isInsideRoot } from "../bin/path-contained.js";
 import { runAdaptiveAudit } from "./adaptive-sniffer.js";
 import { catalogReferenceRepos } from "./reference-cataloger.js";
 import { annotateStale } from "./freshness.js";
+import { findNodes, dependentsOf, shortestPath, neighborFiles, proximityBoost } from "./graph.js";
 // Ensure all diagnostic logging goes strictly to stderr. stdout is exclusively for JSON-RPC 2.0.
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 function logDebug(msg) {
@@ -175,20 +178,23 @@ function withFreshness(projectRoot, run) {
         return r;
     return { ...r, content: annotateStale(root, idx.data.fileStamps, r.content) };
 }
-export function toolFind(query, projectRoot, compact = true) {
-    return withFreshness(projectRoot, () => findImpl(query, projectRoot, compact));
+export function toolFind(query, projectRoot, compact = true, activeFile) {
+    return withFreshness(projectRoot, () => findImpl(query, projectRoot, compact, activeFile));
 }
 export function toolLocateVisual(query, projectRoot) {
     return withFreshness(projectRoot, () => locateVisualImpl(query, projectRoot));
 }
 // 1. Tool: fullstack_find
-function findImpl(query, projectRoot, compact = true) {
+function findImpl(query, projectRoot, compact = true, activeFile) {
     const root = resolveProjectRoot(projectRoot);
+    const active = activeFile
+        ? (path.isAbsolute(activeFile) ? path.relative(root, activeFile) : activeFile).replace(/\\/g, "/").replace(/^\.\//, "")
+        : "";
     const q = (query || "").toLowerCase().trim();
     if (!q) {
         return { content: "❌ Query parameter cannot be empty.", isError: true };
     }
-    const cacheKey = `find:${root}:${compact ? "c" : "f"}:${q}`;
+    const cacheKey = `find:${root}:${compact ? "c" : "f"}:${q}${active ? `:@${active}` : ""}`;
     const cached = findLruCache.get(cacheKey);
     if (cached !== undefined) {
         return { content: cached, isError: false };
@@ -249,6 +255,11 @@ function findImpl(query, projectRoot, compact = true) {
                 hits.push({ entry, score });
             }
         });
+        if (active) {
+            const near = neighborFiles(index.causalGraph, active);
+            for (const h of hits)
+                h.score += proximityBoost(h.entry.file || "", active, near, h.score);
+        }
         hits.sort((a, b) => b.score - a.score);
         if (hits.length === 0) {
             const emptyResult = `ZERO_MATCH: "${query}" in .atlas-index.json.`;
@@ -398,6 +409,89 @@ export function toolResolve(name, projectRoot) {
     }
     return { content: out.join("\n"), isError: false };
 }
+// 11. Tool: fullstack_impact
+export function toolImpact(symbol, projectRoot, depth = 3) {
+    if (!symbol || !symbol.trim())
+        return { content: "❌ 'symbol' parameter is required.", isError: true };
+    const maxDepth = Math.min(6, Math.max(1, Math.floor(Number(depth)) || 3));
+    return withFreshness(projectRoot, () => {
+        const root = resolveProjectRoot(projectRoot);
+        const idx = getCachedAtlasIndex(path.join(root, "docs", "frontend-atlas", ".atlas-index.json"));
+        if (!idx)
+            return { content: `❌ [Atlas Not Found] Call "fullstack_audit" first.`, isError: false };
+        const entries = idx.data.entries || [];
+        const entryLoc = (e) => `${e.file}:${e.line} [${(e.category || "").toUpperCase()}] ${e.symbol}`;
+        const g = idx.data.causalGraph;
+        const cands = g ? findNodes(g, symbol) : [];
+        const start = cands[0];
+        if (!g || !start) {
+            const q = symbol.toLowerCase().trim();
+            const sym = (e) => (e.symbol || "").toLowerCase();
+            const hits = entries.filter(e => sym(e) === q).concat(entries.filter(e => sym(e) !== q && sym(e).includes(q))).slice(0, 15);
+            if (!hits.length)
+                return { content: `ZERO_MATCH: "${symbol}" has no graph node or atlas entry.`, isError: false };
+            return { content: `Graph had no edges for "${symbol}"; file-level matches only:\n${hits.map(entryLoc).join("\n")}`, isError: false };
+        }
+        const { items, truncated } = dependentsOf(g, start.id, maxDepth, 60);
+        const loc = (n) => {
+            const e = n.source ? null : entries.find(x => x.symbol === (n.label || n.id));
+            return `${n.source || e?.file || "unknown"}:${n.line || e?.line || 1}`;
+        };
+        const out = [`Impact of ${start.label || start.id} [${start.type}] ${loc(start)}`];
+        if (cands.length > 1)
+            out.push(`(ambiguous: picked "${start.id}" of ${cands.length}: ${cands.slice(0, 5).map(c => c.id).join(", ")})`);
+        for (let d = 1; d <= maxDepth; d++) {
+            const lvl = items.filter(i => i.depth === d);
+            if (!lvl.length)
+                continue;
+            out.push(`d${d}:`);
+            for (const i of lvl)
+                out.push(`${loc(i.node)} [${i.node.type}] ${i.node.label || i.node.id} (${i.via})`);
+        }
+        const files = new Set(items.map(i => loc(i.node).replace(/:\d+$/, "")));
+        out.push(items.length ? `${items.length} dependents across ${files.size} files${truncated ? " (truncated at 60)" : ""}` : "0 dependents (nothing in the graph depends on this)");
+        return { content: out.join("\n"), isError: false };
+    });
+}
+// 12. Tool: fullstack_component
+export function toolComponent(name, projectRoot) {
+    if (!name || !name.trim())
+        return { content: "❌ 'name' parameter is required.", isError: true };
+    return withFreshness(projectRoot, () => {
+        const root = resolveProjectRoot(projectRoot);
+        const idx = getCachedAtlasIndex(path.join(root, "docs", "frontend-atlas", ".atlas-index.json"));
+        if (!idx)
+            return { content: `❌ [Atlas Not Found] Call "fullstack_audit" first.`, isError: false };
+        const q = name.toLowerCase().trim();
+        const pick = (list, nm) => {
+            const exact = list.filter(x => nm(x).toLowerCase() === q);
+            if (exact.length)
+                return exact;
+            const pre = list.filter(x => nm(x).toLowerCase().startsWith(q));
+            return pre.concat(list.filter(x => !pre.includes(x) && nm(x).toLowerCase().includes(q))).slice(0, 5);
+        };
+        const comps = idx.data.components;
+        if (!comps) {
+            const hits = pick((idx.data.entries || []).filter(e => e.category === "component"), e => e.symbol);
+            const head = "Component props are not indexed: re-run the audit (fullstack_audit) to index component props.";
+            if (!hits.length)
+                return { content: `ZERO_MATCH: no component "${name}". ${head}`, isError: false };
+            return { content: `${head}\n${hits.map(e => `${e.file}:${e.line} [EXISTS] ${e.symbol}`).join("\n")}`, isError: false };
+        }
+        const hits = pick(comps, c => c.name);
+        if (!hits.length)
+            return { content: `ZERO_MATCH: no component "${name}" in the atlas.`, isError: false };
+        const out = hits.map(c => {
+            const lines = [`${c.file}:${c.line} [EXISTS] ${c.name}`];
+            lines.push(`  props: ${c.props.length ? c.props.map(p => `${p.name}${p.optional ? "?" : ""}${p.type ? `: ${p.type}` : ""}`).join(", ") : "(none)"}`);
+            for (const [grp, vals] of Object.entries(c.variants || {}))
+                lines.push(`  variant ${grp}: ${vals.join(" | ")}`);
+            lines.push(`  used in ${c.usageCount} file(s)`);
+            return lines.join("\n");
+        });
+        return { content: out.join("\n"), isError: false };
+    });
+}
 // 4. Tool: fullstack_path
 export function toolCausalPath(from, to, projectRoot) {
     const root = resolveProjectRoot(projectRoot);
@@ -479,41 +573,25 @@ export function toolCausalPath(from, to, projectRoot) {
             isError: false,
         };
     }
-    const startNode = nodes.find(n => n.id.toLowerCase().includes(fromQ) || (n.label || "").toLowerCase().includes(fromQ));
-    const endNode = nodes.find(n => n.id.toLowerCase().includes(toQ) || (n.label || "").toLowerCase().includes(toQ));
+    const g = { nodes, links };
+    const startNode = findNodes(g, fromQ)[0];
+    const endNode = findNodes(g, toQ)[0];
     if (!startNode)
         return { content: `❌ Start node matching "${from}" not found.`, isError: false };
     if (!endNode)
         return { content: `❌ Target node matching "${to}" not found.`, isError: false };
-    // BFS
-    const queue = [{ current: startNode.id, path: [startNode.id] }];
-    const visited = new Set([startNode.id]);
-    let foundPath = null;
-    while (queue.length > 0) {
-        const { current, path: curPath } = queue.shift();
-        if (current === endNode.id) {
-            foundPath = curPath;
-            break;
-        }
-        const neighbors = links.filter(l => l.source === current).map(l => l.target);
-        for (const n of neighbors) {
-            if (!visited.has(n)) {
-                visited.add(n);
-                queue.push({ current: n, path: [...curPath, n] });
-            }
-        }
-    }
-    if (!foundPath) {
-        const noPathMsg = `❌ No causal dependency path found between "${from}" and "${to}".`;
+    const found = shortestPath(g, startNode.id, endNode.id, 8);
+    if (!found) {
+        const noPathMsg = `❌ No causal dependency path found between "${from}" and "${to}" (max 8 hops).`;
         pathLruCache.set(cacheKey, noPathMsg);
         return { content: noPathMsg, isError: false };
     }
+    const foundPath = found.ids;
     const steps = foundPath.map((nodeId, idx) => {
-        const nodeObj = nodes.find(n => n.id === nodeId);
-        const typeLabel = (nodeObj?.type || "unknown").toUpperCase();
-        return `   ${idx + 1}. [${typeLabel}] ${nodeId}`;
+        const typeLabel = (nodes.find(n => n.id === nodeId)?.type || "unknown").toUpperCase();
+        return `   ${idx + 1}. [${typeLabel}] ${nodeId}${idx > 0 ? ` (via ${found.types[idx - 1]})` : ""}`;
     });
-    const outputResult = `⚡ [CAUSAL PATH]\n${foundPath.join(" ➔ ")}\n\nSteps:\n${steps.join("\n")}`;
+    const outputResult = `⚡ [CAUSAL PATH]\n${foundPath.map((id, i) => (i ? `-${found.types[i - 1]}-> ` : "") + id).join(" ")}\n\nSteps:\n${steps.join("\n")}`;
     pathLruCache.set(cacheKey, outputResult);
     return {
         content: outputResult,
@@ -787,7 +865,8 @@ const TOOL_DEFINITIONS = [
             properties: {
                 query: { type: "string", description: "Search query (e.g. 'theme-toggle', 'login', 'UserProfile', 'useAuth')" },
                 projectRoot: { type: "string", description: "Optional project root directory path. Defaults to active workspace." },
-                compact: { type: "boolean", description: "Whether to return compact single-line outputs (default: true)." }
+                compact: { type: "boolean", description: "Whether to return compact single-line outputs (default: true)." },
+                activeFile: { type: "string", description: "Optional file you are editing (project-relative or absolute). Hits in it, its import-graph neighbours and its directory rank higher." }
             },
             required: ["query"]
         }
@@ -827,6 +906,31 @@ const TOOL_DEFINITIONS = [
                 projectRoot: { type: "string", description: "Optional project root directory path. Defaults to active workspace." }
             },
             required: ["from", "to"]
+        }
+    },
+    {
+        name: "fullstack_impact",
+        description: "Blast radius: what depends on a symbol, so what could break if you change it. Walks the causal graph in reverse (callers, importers, users) up to 'depth' hops and lists dependents grouped by depth with file:line. Use it before renaming, changing a signature, or editing a model/action.",
+        inputSchema: {
+            type: "object",
+            properties: {
+                symbol: { type: "string", description: "Component, action, API route or model name (e.g. 'createSubscription', 'UserModel')" },
+                depth: { type: "number", description: "Max hops to walk (default 3, max 6)." },
+                projectRoot: { type: "string", description: "Optional project root directory path. Defaults to active workspace." }
+            },
+            required: ["symbol"]
+        }
+    },
+    {
+        name: "fullstack_component",
+        description: "Look up a component's props, cva variants and usage count. Call it BEFORE building a new component: an [EXISTS] hit means a similar one is already there and should be reused or extended.",
+        inputSchema: {
+            type: "object",
+            properties: {
+                name: { type: "string", description: "Component name (exact, prefix or substring, e.g. 'Button', 'Modal')" },
+                projectRoot: { type: "string", description: "Optional project root directory path. Defaults to active workspace." }
+            },
+            required: ["name"]
         }
     },
     {
@@ -979,7 +1083,13 @@ export function startMcpServer() {
                 let result = { content: "Unknown tool", isError: true };
                 switch (toolName) {
                     case "fullstack_find":
-                        result = toolFind(args.query, args.projectRoot, args.compact ?? true);
+                        result = toolFind(args.query, args.projectRoot, args.compact ?? true, args.activeFile);
+                        break;
+                    case "fullstack_impact":
+                        result = toolImpact(args.symbol, args.projectRoot, args.depth);
+                        break;
+                    case "fullstack_component":
+                        result = toolComponent(args.name, args.projectRoot);
                         break;
                     case "fullstack_locate_visual":
                         result = toolLocateVisual(args.query, args.projectRoot);

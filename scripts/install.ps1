@@ -67,7 +67,7 @@ Invoke-WebRequest -Uri "$BaseUrl/SKILL.md" -OutFile (Join-Path $TargetDir "SKILL
 Invoke-WebRequest -Uri "$BaseUrl/scripts/audit.ts" -OutFile (Join-Path $ScriptsDir "audit.ts")
 Invoke-WebRequest -Uri "$BaseUrl/scripts/audit-backend.ts" -OutFile (Join-Path $ScriptsDir "audit-backend.ts")
 Invoke-WebRequest -Uri "$BaseUrl/scripts/constants.ts" -OutFile (Join-Path $ScriptsDir "constants.ts")
-foreach ($f in @("precision-patcher.ts", "adaptive-sniffer.ts", "reference-cataloger.ts", "safe-walk.ts", "freshness.ts")) {
+foreach ($f in @("precision-patcher.ts", "adaptive-sniffer.ts", "reference-cataloger.ts", "safe-walk.ts", "freshness.ts", "graph.ts")) {
     Invoke-WebRequest -Uri "$BaseUrl/scripts/$f" -OutFile (Join-Path $ScriptsDir $f)
 }
 
@@ -79,7 +79,7 @@ Invoke-WebRequest -Uri "$BaseUrl/bin/mcp-server.js" -OutFile (Join-Path $BinDir 
 
 $DistDir = Join-Path $TargetDir "dist"
 if (-not (Test-Path $DistDir)) { New-Item -ItemType Directory -Force -Path $DistDir | Out-Null }
-foreach ($f in @("mcp-server", "constants", "precision-patcher", "adaptive-sniffer", "reference-cataloger", "freshness")) {
+foreach ($f in @("mcp-server", "constants", "precision-patcher", "adaptive-sniffer", "reference-cataloger", "freshness", "graph")) {
     Invoke-WebRequest -Uri "$BaseUrl/dist/$f.js" -OutFile (Join-Path $DistDir "$f.js")
 }
 
@@ -127,7 +127,7 @@ if ($enableCaveman) { $RuleParts.Add(@'
 $RuleParts.Add(@'
 
 ### Commands
-- MCP tools: `fullstack_find`, `fullstack_locate_visual`, `fullstack_resolve`, `fullstack_path`, `fullstack_symbol`, `fullstack_patch`, `fullstack_audit`, `fullstack_patch_apply`, `fullstack_batch_replace`, `fullstack_reference`
+- MCP tools: `fullstack_find`, `fullstack_locate_visual`, `fullstack_resolve`, `fullstack_path`, `fullstack_symbol`, `fullstack_patch`, `fullstack_audit`, `fullstack_patch_apply`, `fullstack_batch_replace`, `fullstack_reference`, `fullstack_impact`, `fullstack_component`
 - `/fullstack-audit` or `npx fullstack-audit`: rebuild the atlas and `docs/llms.txt`
 - `npx fullstack-audit --theme --route <route> --compact`: design-token punchlist for one route
 - `npx fullstack-audit --verify --gate-clean`: typecheck and atlas gate

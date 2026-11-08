@@ -13,6 +13,8 @@ import { stampFiles } from "./freshness.js";
 import { runAdaptiveAudit } from "./adaptive-sniffer.js";
 import { catalogReferenceRepos } from "./reference-cataloger.js";
 import {
+  ComponentDetail,
+  ComponentProp,
   FULLSTACK_AUDIT_VERSION,
   FULLSTACK_AUDIT_ENGINE,
   FULLSTACK_AUDIT_RELEASE_DATE,
@@ -255,6 +257,10 @@ interface ComponentAudit {
   visualIcons: VisualIconUsage[];
   hasDirectStyleTag: boolean;
   isExportedComponent: boolean;
+  componentFacts: ComponentFact[];
+  importBindings: { spec: string; names: string[] }[];
+  /** project-relative files this file imports (re-exports, dynamic imports and tsconfig aliases included) */
+  resolvedImports?: string[];
   centralityScore?: number;
   centralityBadge?: string;
 }
@@ -987,6 +993,272 @@ function extractJsxElement(
 }
 
 // 4. File-Level Audit with Next.js Boundary Radar, a11y & Icon Indexing
+// ---------------------------------------------------------------------------
+// Module analysis on the shared TS AST: components, props, cva variants, import specifiers
+// ---------------------------------------------------------------------------
+type ComponentFact = ComponentDetail & { isDefault: boolean };
+
+interface ModuleFacts {
+  components: ComponentFact[];
+  specifiers: string[];
+  bindings: { spec: string; names: string[] }[];
+}
+
+const PROPS_CAP = 30;
+const TYPE_TEXT_CAP = 80;
+
+// PascalCase only: SCREAMING_CASE and camelCase constants are never components.
+function isComponentName(n: string): boolean {
+  return /^[A-Z][A-Za-z0-9]*$/.test(n) && /[a-z]/.test(n);
+}
+
+function containsJsx(node: ts.Node): boolean {
+  let found = false;
+  (function visit(n: ts.Node) {
+    if (found) return;
+    if (ts.isJsxElement(n) || ts.isJsxSelfClosingElement(n) || ts.isJsxFragment(n)) { found = true; return; }
+    if (ts.isCallExpression(n) && /(^|\.)(createElement|jsxs?|jsxDEV)$/.test(n.expression.getText())) { found = true; return; }
+    ts.forEachChild(n, visit);
+  })(node);
+  return found;
+}
+
+// Peel parens/`as`/forwardRef()/memo() wrappers down to the render function; also report the wrapper's type arguments.
+function unwrapComponentFn(e: ts.Expression, typeArgs: ts.TypeNode[] = []): { fn?: ts.SignatureDeclaration & { body?: ts.Node }; typeArgs: ts.TypeNode[] } {
+  while (ts.isParenthesizedExpression(e) || ts.isAsExpression(e)) e = e.expression;
+  if (ts.isArrowFunction(e) || ts.isFunctionExpression(e)) return { fn: e, typeArgs };
+  if (ts.isCallExpression(e) && /(^|\.)(forwardRef|memo)$/.test(e.expression.getText()) && e.arguments[0]) {
+    const isRef = /forwardRef$/.test(e.expression.getText());
+    const ta = e.typeArguments ? (isRef ? e.typeArguments.slice(1) : e.typeArguments.slice(0, 1)) : typeArgs;
+    return unwrapComponentFn(e.arguments[0], ta);
+  }
+  return { typeArgs };
+}
+
+function analyzeModule(sf: ts.SourceFile): ModuleFacts {
+  const decls = new Map<string, ts.InterfaceDeclaration | ts.TypeAliasDeclaration>();
+  const specifiers: string[] = [];
+  const bindings: { spec: string; names: string[] }[] = [];
+  const exportedNames = new Set<string>();
+  let defaultName: string | undefined;
+
+  const hasMod = (n: ts.Node, k: ts.SyntaxKind) => !!(ts.canHaveModifiers(n) && ts.getModifiers(n)?.some(m => m.kind === k));
+  const line = (n: ts.Node) => sf.getLineAndCharacterOfPosition(n.getStart(sf)).line + 1;
+
+  for (const st of sf.statements) {
+    if (ts.isInterfaceDeclaration(st) || ts.isTypeAliasDeclaration(st)) decls.set(st.name.text, st);
+    if (ts.isImportDeclaration(st) && ts.isStringLiteral(st.moduleSpecifier)) {
+      const spec = st.moduleSpecifier.text;
+      specifiers.push(spec);
+      const names: string[] = [];
+      const ic = st.importClause;
+      if (ic?.name) names.push("default");
+      if (ic?.namedBindings) {
+        if (ts.isNamespaceImport(ic.namedBindings)) names.push("*");
+        else ic.namedBindings.elements.forEach(el => names.push((el.propertyName ?? el.name).text));
+      }
+      bindings.push({ spec, names });
+    } else if (ts.isExportDeclaration(st)) {
+      if (st.moduleSpecifier && ts.isStringLiteral(st.moduleSpecifier)) {
+        // re-exports count as imports: `export { x } from`, `export * from`
+        specifiers.push(st.moduleSpecifier.text);
+        const names = st.exportClause && ts.isNamedExports(st.exportClause)
+          ? st.exportClause.elements.map(el => (el.propertyName ?? el.name).text)
+          : ["*"];
+        bindings.push({ spec: st.moduleSpecifier.text, names });
+      } else if (st.exportClause && ts.isNamedExports(st.exportClause)) {
+        st.exportClause.elements.forEach(el => {
+          const local = (el.propertyName ?? el.name).text;
+          exportedNames.add(local);
+          if (el.name.text === "default") defaultName = local;
+        });
+      }
+    } else if (ts.isExportAssignment(st) && ts.isIdentifier(st.expression)) {
+      defaultName = st.expression.text;
+      exportedNames.add(st.expression.text);
+    }
+  }
+
+  // Dynamic import("x") and require("x") with literal arguments, anywhere in the file
+  (function scan(n: ts.Node) {
+    if (ts.isCallExpression(n) && n.arguments.length > 0 && ts.isStringLiteralLike(n.arguments[0])) {
+      if (n.expression.kind === ts.SyntaxKind.ImportKeyword || (ts.isIdentifier(n.expression) && n.expression.text === "require")) {
+        const spec = (n.arguments[0] as ts.StringLiteralLike).text;
+        specifiers.push(spec);
+        bindings.push({ spec, names: ["*"] });
+      }
+    }
+    ts.forEachChild(n, scan);
+  })(sf);
+
+  // Props from interface / type alias / inline literal of the first parameter
+  const addMembers = (members: ts.NodeArray<ts.TypeElement>, out: Map<string, ComponentProp>) => {
+    members.forEach(m => {
+      if ((ts.isPropertySignature(m) || ts.isMethodSignature(m)) && m.name) {
+        const name = m.name.getText(sf).replace(/^["']|["']$/g, "");
+        if (out.has(name)) return;
+        const type = ts.isPropertySignature(m) && m.type ? m.type.getText(sf).replace(/\s+/g, " ").slice(0, TYPE_TEXT_CAP) : "function";
+        out.set(name, { name, type, optional: !!m.questionToken });
+      }
+    });
+  };
+  const collect = (t: ts.TypeNode | undefined, out: Map<string, ComponentProp>, depth = 0) => {
+    if (!t || depth > 4) return;
+    if (ts.isParenthesizedTypeNode(t)) return collect(t.type, out, depth + 1);
+    if (ts.isTypeLiteralNode(t)) return addMembers(t.members, out);
+    if (ts.isIntersectionTypeNode(t)) return t.types.forEach(x => collect(x, out, depth + 1));
+    if (!ts.isTypeReferenceNode(t)) return;
+    const d = decls.get(t.typeName.getText(sf));
+    if (d) collectDecl(d, out, depth + 1);
+    else if (t.typeArguments?.[0] && /(^|\.)(PropsWithChildren|Readonly)$/.test(t.typeName.getText(sf))) collect(t.typeArguments[0], out, depth + 1);
+  };
+  const collectDecl = (d: ts.InterfaceDeclaration | ts.TypeAliasDeclaration, out: Map<string, ComponentProp>, depth: number) => {
+    if (depth > 4) return;
+    if (ts.isTypeAliasDeclaration(d)) return collect(d.type, out, depth);
+    addMembers(d.members, out);
+    d.heritageClauses?.forEach(hc => hc.types.forEach(ht => {
+      const hd = decls.get(ht.expression.getText(sf));
+      if (hd) collectDecl(hd, out, depth + 1);
+    }));
+  };
+
+  const components: ComponentFact[] = [];
+  const texts = new Map<string, string>();
+  const addComponent = (name: string, fn: ts.SignatureDeclaration & { body?: ts.Node }, at: ts.Node, exported: boolean, hasDefaultMod: boolean, typeNode?: ts.TypeNode) => {
+    if (!isComponentName(name) || !fn.body || !containsJsx(fn.body)) return;
+    const out = new Map<string, ComponentProp>();
+    const p0 = fn.parameters[0];
+    collect(p0?.type ?? typeNode, out);
+    if (p0 && ts.isObjectBindingPattern(p0.name)) {
+      p0.name.elements.forEach(el => {
+        if (el.dotDotDotToken) return;
+        const pn = (el.propertyName ?? el.name).getText(sf);
+        const cur = out.get(pn);
+        if (cur) { if (el.initializer) cur.optional = true; }
+        else out.set(pn, { name: pn, optional: !!el.initializer });
+      });
+    }
+    texts.set(name, (ts.isVariableDeclaration(at) ? at.parent.parent : at).getText(sf));
+    components.push({
+      name,
+      file: "",
+      line: line(at),
+      props: Array.from(out.values()).slice(0, PROPS_CAP),
+      variants: {},
+      usageCount: 0,
+      isDefault: hasDefaultMod,
+    });
+    if (exported) exportedNames.add(name);
+  };
+
+  for (const st of sf.statements) {
+    const exp = hasMod(st, ts.SyntaxKind.ExportKeyword);
+    const def = hasMod(st, ts.SyntaxKind.DefaultKeyword);
+    if (ts.isFunctionDeclaration(st) && st.name) {
+      addComponent(st.name.text, st, st, exp, exp && def);
+    } else if (ts.isVariableStatement(st)) {
+      st.declarationList.declarations.forEach(d => {
+        if (!ts.isIdentifier(d.name) || !d.initializer) return;
+        const { fn, typeArgs } = unwrapComponentFn(d.initializer);
+        if (!fn) return;
+        const annotated = d.type && ts.isTypeReferenceNode(d.type) ? d.type.typeArguments?.[0] : undefined;
+        addComponent(d.name.text, fn, d, exp, false, typeArgs[0] ?? annotated);
+      });
+    }
+  }
+  components.forEach(c => { if (c.name === defaultName) c.isDefault = true; });
+
+  // cva(base, { variants: { size: { sm: "", md: "" } } }) -> { size: ["sm", "md"] }, attached to the component that calls the const
+  (function findCva(n: ts.Node) {
+    if (ts.isCallExpression(n) && ts.isIdentifier(n.expression) && n.expression.text === "cva") {
+      const cfg = n.arguments[1];
+      const vprop = cfg && ts.isObjectLiteralExpression(cfg)
+        ? cfg.properties.find(p => ts.isPropertyAssignment(p) && p.name.getText(sf) === "variants") as ts.PropertyAssignment | undefined
+        : undefined;
+      if (vprop && ts.isObjectLiteralExpression(vprop.initializer)) {
+        const variants: Record<string, string[]> = {};
+        vprop.initializer.properties.forEach(g => {
+          if (ts.isPropertyAssignment(g) && ts.isObjectLiteralExpression(g.initializer)) {
+            variants[g.name.getText(sf).replace(/^["']|["']$/g, "")] = g.initializer.properties
+              .map(o => o.name ? o.name.getText(sf).replace(/^["']|["']$/g, "") : "")
+              .filter(Boolean);
+          }
+        });
+        const varName = ts.isVariableDeclaration(n.parent) && ts.isIdentifier(n.parent.name) ? n.parent.name.text : undefined;
+        const users = varName
+          ? components.filter(c => {
+              return new RegExp(`\\b${varName}\\s*\\(`).test(texts.get(c.name) || "");
+            })
+          : [];
+        const main = components.find(c => exportedNames.has(c.name)) ?? components[0];
+        const targets = users.length > 0 ? users : main ? [main] : [];
+        targets.forEach(c => Object.assign(c.variants, variants));
+      }
+    }
+    ts.forEachChild(n, findCva);
+  })(sf);
+
+  return { components, specifiers, bindings };
+}
+
+// tsconfig / jsconfig `paths` + `baseUrl`, read once per root
+interface AliasConfig { baseUrl: string; paths: { prefix: string; suffix: string; wildcard: boolean; targets: string[] }[] }
+let aliasConfigCache: { root: string; cfg: AliasConfig } | undefined;
+
+function loadAliasConfig(rootDir: string): AliasConfig {
+  if (aliasConfigCache?.root === rootDir) return aliasConfigCache.cfg;
+  const cfg: AliasConfig = { baseUrl: "", paths: [] };
+  for (const name of ["tsconfig.json", "jsconfig.json"]) {
+    const p = path.join(rootDir, name);
+    if (!fs.existsSync(p)) continue;
+    try {
+      const co = ts.parseConfigFileTextToJson(p, fs.readFileSync(p, "utf-8")).config?.compilerOptions || {};
+      cfg.baseUrl = typeof co.baseUrl === "string" ? co.baseUrl.replace(/^\.\//, "").replace(/\/$/, "") : "";
+      Object.entries((co.paths || {}) as Record<string, string[]>).forEach(([k, targets]) => {
+        const star = k.indexOf("*");
+        cfg.paths.push({
+          prefix: star < 0 ? k : k.slice(0, star),
+          suffix: star < 0 ? "" : k.slice(star + 1),
+          wildcard: star >= 0,
+          targets: targets.map(t => t.replace(/^\.\//, "")),
+        });
+      });
+      break;
+    } catch {}
+  }
+  aliasConfigCache = { root: rootDir, cfg };
+  return cfg;
+}
+
+const RESOLVE_EXTS = ["", ".ts", ".tsx", ".js", ".jsx", ".vue", ".svelte", ".astro", "/index.ts", "/index.tsx", "/index.js", "/index.jsx"];
+
+// Resolve an import specifier to a project-relative file in `known`, or undefined (packages, unknown aliases).
+function resolveImportSpec(spec: string, fromRel: string, known: Set<string>, rootDir: string): string | undefined {
+  const bases: string[] = [];
+  if (spec.startsWith(".")) {
+    bases.push(path.posix.normalize(path.posix.join(path.posix.dirname(fromRel), spec)));
+  } else {
+    const cfg = loadAliasConfig(rootDir);
+    for (const p of cfg.paths) {
+      if (p.wildcard ? spec.startsWith(p.prefix) && spec.endsWith(p.suffix) && spec.length >= p.prefix.length + p.suffix.length : spec === p.prefix) {
+        const mid = p.wildcard ? spec.slice(p.prefix.length, spec.length - p.suffix.length) : "";
+        p.targets.forEach(t => bases.push(path.posix.normalize(path.posix.join(cfg.baseUrl, t.replace("*", mid)))));
+      }
+    }
+    if (cfg.baseUrl) bases.push(path.posix.normalize(path.posix.join(cfg.baseUrl, spec)));
+    // conventional aliases when tsconfig does not declare them
+    if (spec.startsWith("@/") || spec.startsWith("~/")) bases.push(spec.slice(2), `src/${spec.slice(2)}`);
+    if (spec.startsWith("$lib/")) bases.push(`src/lib/${spec.slice(5)}`);
+  }
+  for (const b of bases) for (const ext of RESOLVE_EXTS) if (known.has(b + ext)) return b + ext;
+  return undefined;
+}
+
+function isAliasSpec(spec: string): boolean {
+  const cfg = loadAliasConfig(ROOT_DIR);
+  return cfg.paths.some(p => p.wildcard ? spec.startsWith(p.prefix) && spec.endsWith(p.suffix) : spec === p.prefix);
+}
+
 function auditFile(filePath: string, structure: ProjectStructure): ComponentAudit {
   const content = fs.readFileSync(filePath, "utf-8");
   const lines = content.split("\n");
@@ -1026,6 +1298,8 @@ function auditFile(filePath: string, structure: ProjectStructure): ComponentAudi
   const seenLabels = new Set<string>();
   let hasDirectStyleTag = false;
   let isExportedComponent = false;
+  let componentFacts: ComponentFact[] = [];
+  let importBindings: { spec: string; names: string[] }[] = [];
 
   function addLabel(line: number, text: string, type: VisibleLabel["type"], snippet: string, hasUppercase = false) {
     const cleanText = text
@@ -1504,7 +1778,7 @@ function auditFile(filePath: string, structure: ProjectStructure): ComponentAudi
         content,
         ts.ScriptTarget.Latest,
         /* setParentNodes */ true,
-        isJsx ? ts.ScriptKind.TSX : ts.ScriptKind.TS
+        isJsx || filePath.endsWith(".js") ? ts.ScriptKind.TSX : ts.ScriptKind.TS
       );
 
       function walkAst(node: ts.Node) {
@@ -1686,6 +1960,18 @@ function auditFile(filePath: string, structure: ProjectStructure): ComponentAudi
       }
 
       walkAst(sf);
+
+      // Components (PascalCase + returns JSX), props, cva variants and import edges from the same AST
+      const facts = analyzeModule(sf);
+      componentFacts = facts.components;
+      facts.components.forEach(c => { c.file = relPath; });
+      componentNames.length = 0;
+      facts.components.forEach(c => { if (!componentNames.includes(c.name)) componentNames.push(c.name); });
+      isExportedComponent = componentNames.length > 0;
+      importBindings = facts.bindings;
+      facts.specifiers.forEach(spec => {
+        if ((spec.startsWith(".") || /^(@|~|\$lib)\//.test(spec) || isAliasSpec(spec)) && !imports.includes(spec)) imports.push(spec);
+      });
     } catch {
       // Fallback gracefully if any source file contains non-standard syntax
     }
@@ -1717,6 +2003,8 @@ function auditFile(filePath: string, structure: ProjectStructure): ComponentAudi
     visualIcons,
     hasDirectStyleTag,
     isExportedComponent,
+    componentFacts,
+    importBindings,
   };
 }
 
@@ -3709,6 +3997,41 @@ function executeFastAtlasFind(query: string, compact: boolean): boolean {
   }
 }
 
+function resolveAllImports(audits: ComponentAudit[]) {
+  const known = new Set(audits.map(a => a.relativePath));
+  audits.forEach(a => {
+    const out = new Set<string>();
+    [...a.imports, ...a.importBindings.map(b => b.spec)].forEach(spec => {
+      const r = resolveImportSpec(spec, a.relativePath, known, ROOT_DIR);
+      if (r && r !== a.relativePath) out.add(r);
+    });
+    a.resolvedImports = Array.from(out);
+  });
+}
+
+// Per-component props, cva variants and the number of OTHER files that import the component by name.
+function buildComponentDetails(audits: ComponentAudit[]): ComponentDetail[] {
+  const known = new Set(audits.map(a => a.relativePath));
+  const importers = new Map<string, Map<string, Set<string>>>(); // target file -> importer file -> imported names
+  audits.forEach(a => a.importBindings.forEach(b => {
+    const target = resolveImportSpec(b.spec, a.relativePath, known, ROOT_DIR);
+    if (!target || target === a.relativePath) return;
+    if (!importers.has(target)) importers.set(target, new Map());
+    const m = importers.get(target)!;
+    if (!m.has(a.relativePath)) m.set(a.relativePath, new Set());
+    b.names.forEach(n => m.get(a.relativePath)!.add(n));
+  }));
+  const details: ComponentDetail[] = [];
+  audits.forEach(a => a.componentFacts.forEach(({ isDefault, ...c }) => {
+    let usageCount = 0;
+    importers.get(a.relativePath)?.forEach(names => {
+      if (names.has(c.name) || names.has("*") || (isDefault && names.has("default"))) usageCount++;
+    });
+    details.push({ ...c, usageCount });
+  }));
+  return details;
+}
+
 function buildAndSaveAtlasIndex(
   audits: ComponentAudit[],
   routeMaps: RouteMapItem[],
@@ -3733,15 +4056,17 @@ function buildAndSaveAtlasIndex(
 
   // 2. Components & UI Elements
   audits.forEach(a => {
-    const primaryName = a.componentNames[0] || path.basename(a.relativePath).replace(/\.[^/.]+$/, "");
-    entries.push({
-      symbol: primaryName,
-      category: "component",
-      file: a.relativePath,
-      line: 1,
-      meta: `${a.zone} [Centrality: ${a.centralityScore || 0}]`,
-      atlasRef: "docs/frontend-atlas/02_COMPONENT_INVENTORY.md",
-    });
+    // Only files with a detected component get a COMPONENT entry; plain modules and constants do not.
+    if (a.componentNames.length > 0) {
+      entries.push({
+        symbol: a.componentNames[0],
+        category: "component",
+        file: a.relativePath,
+        line: a.componentFacts.find(c => c.name === a.componentNames[0])?.line ?? 1,
+        meta: `${a.zone} [Centrality: ${a.centralityScore || 0}]`,
+        atlasRef: "docs/frontend-atlas/02_COMPONENT_INVENTORY.md",
+      });
+    }
 
     a.disclosedOverlays.forEach(o => {
       entries.push({
@@ -3905,6 +4230,7 @@ function buildAndSaveAtlasIndex(
     totalEntries: entries.length,
     files: indexedFiles,
     fileStamps: stampFiles(ROOT_DIR, indexedFiles),
+    components: buildComponentDetails(audits),
     entries,
     causalGraph: backendCausalGraph,
   };
@@ -4719,6 +5045,16 @@ export function writeTestSuitesMap(testCases: TestCaseAudit[], outputDir: string
   fs.writeFileSync(filePath, md, "utf-8");
 }
 
+function nextMajorVersion(): number {
+  try {
+    const pkg = JSON.parse(fs.readFileSync(path.join(ROOT_DIR, "package.json"), "utf-8"));
+    const range: string = pkg.dependencies?.next || pkg.devDependencies?.next || "";
+    return parseInt(range.replace(/^[^\d]*/, ""), 10) || 0;
+  } catch {
+    return 0;
+  }
+}
+
 function mergeMcpConfig(targetJsonPath: string): boolean {
   try {
     const dir = path.dirname(targetJsonPath);
@@ -4736,6 +5072,10 @@ function mergeMcpConfig(targetJsonPath: string): boolean {
       command: "node",
       args: [mcpServerPath]
     };
+    if (nextMajorVersion() >= 16 && !config.mcpServers["next-devtools"]) {
+      config.mcpServers["next-devtools"] = { command: "npx", args: ["-y", "next-devtools-mcp@latest"] };
+      console.log(`   + Added next-devtools MCP server to ${path.relative(ROOT_DIR, targetJsonPath).replace(/\\/g, "/")} (Next.js 16+)`);
+    }
     fs.writeFileSync(targetJsonPath, JSON.stringify(config, null, 2), "utf-8");
     return true;
   } catch {
@@ -5004,6 +5344,7 @@ export function runUniversalFrontendAudit() {
   const uniqueFiles = Array.from(new Set(allFiles));
 
   const audits = uniqueFiles.map(f => auditFile(f, structure));
+  resolveAllImports(audits);
   computeComponentCentrality(audits);
   const queryTopology = auditQueryCacheTopology(uniqueFiles, ROOT_DIR);
   const routeMaps = buildRouteMap(audits, structure);
