@@ -49,6 +49,9 @@ export interface CausalGraphNode {
   id: string;
   label?: string;
   type: string;
+  /** Repo-relative file defining this node, when known. */
+  source?: string;
+  line?: number;
 }
 
 export interface CausalGraphLink {

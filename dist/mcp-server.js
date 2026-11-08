@@ -494,6 +494,9 @@ export function toolComponent(name, projectRoot) {
 }
 // 4. Tool: fullstack_path
 export function toolCausalPath(from, to, projectRoot) {
+    return withFreshness(projectRoot, () => causalPathImpl(from, to, projectRoot));
+}
+function causalPathImpl(from, to, projectRoot) {
     const root = resolveProjectRoot(projectRoot);
     if (!from || !to)
         return { content: "❌ Both 'from' and 'to' parameters are required.", isError: true };
@@ -591,7 +594,9 @@ export function toolCausalPath(from, to, projectRoot) {
         const typeLabel = (nodes.find(n => n.id === nodeId)?.type || "unknown").toUpperCase();
         return `   ${idx + 1}. [${typeLabel}] ${nodeId}${idx > 0 ? ` (via ${found.types[idx - 1]})` : ""}`;
     });
-    const outputResult = `⚡ [CAUSAL PATH]\n${foundPath.map((id, i) => (i ? `-${found.types[i - 1]}-> ` : "") + id).join(" ")}\n\nSteps:\n${steps.join("\n")}`;
+    const locs = foundPath.map(id => nodes.find(n => n.id === id)).filter(n => n && n.source)
+        .map(n => `${n.source}:${n.line || 1} [${(n.type || "unknown").toUpperCase()}] ${n.label || n.id}`);
+    const outputResult = `⚡ [CAUSAL PATH]\n${foundPath.map((id, i) => (i ? `-${found.types[i - 1]}-> ` : "") + id).join(" ")}\n\nSteps:\n${steps.join("\n")}${locs.length ? `\n\nLocations:\n${locs.join("\n")}` : ""}`;
     pathLruCache.set(cacheKey, outputResult);
     return {
         content: outputResult,
@@ -600,6 +605,9 @@ export function toolCausalPath(from, to, projectRoot) {
 }
 // 5. Tool: fullstack_symbol
 export function toolSymbolSlices(symbolName, projectRoot) {
+    return withFreshness(projectRoot, () => symbolSlicesImpl(symbolName, projectRoot));
+}
+function symbolSlicesImpl(symbolName, projectRoot) {
     const root = resolveProjectRoot(projectRoot);
     if (!symbolName)
         return { content: "❌ Symbol parameter cannot be empty.", isError: true };
@@ -613,7 +621,7 @@ export function toolSymbolSlices(symbolName, projectRoot) {
         if (preHits.length > 0) {
             const out = [`⚡ [GOD-FILE SLICER] Found ${preHits.length} slice(s) matching "${symbolName}":\n`];
             preHits.forEach(h => {
-                out.push(`   - ${h.file}:${h.line} [${h.meta || h.category}] -> ${h.symbol}`);
+                out.push(`${h.file}:${h.line} [${h.meta || h.category}] -> ${h.symbol}`);
             });
             out.push(`\n💡 Target lines above with read_file(StartLine, EndLine) for sub-second precision.`);
             return { content: out.join("\n"), isError: false };
@@ -687,7 +695,7 @@ export function toolSymbolSlices(symbolName, projectRoot) {
     }
     const out = [`⚡ [GOD-FILE SLICER] Found ${hits.length} method/function slice(s) matching "${symbolName}":\n`];
     hits.forEach(h => {
-        out.push(`   - ${h.relPath}:${h.startLine}-${h.endLine} [L${h.startLine}–L${h.endLine} (${h.lineCount} lines)] -> ${h.symbol}`);
+        out.push(`${h.relPath}:${h.startLine} [L${h.startLine}–L${h.endLine} (${h.lineCount} lines)] -> ${h.symbol}`);
     });
     out.push(`\n💡 Tip: Call read_file with StartLine=${hits[0].startLine} and EndLine=${hits[0].endLine} to save context!`);
     return { content: out.join("\n"), isError: false };

@@ -145,6 +145,9 @@ export interface FullstackBridgeItem {
   externalService?: string;
   domainServices?: string[];
   serviceCalls?: string[];
+  backendFile?: string;
+  backendLine?: number;
+  serviceFiles?: Record<string, string>;
 }
 
 export interface BackendAuditResult {
@@ -943,8 +946,9 @@ export function buildFullstackBridge(
     return null;
   }
 
-  function extractDomainServices(content: string, filePath: string): { services: string[]; serviceCalls: string[]; extraContents: string[] } {
+  function extractDomainServices(content: string, filePath: string): { services: string[]; serviceCalls: string[]; extraContents: string[]; serviceFiles: Record<string, string> } {
     const services: string[] = [];
+    const serviceFiles: Record<string, string> = {};
     const serviceCalls: string[] = [];
     const extraContents: string[] = [];
 
@@ -968,6 +972,7 @@ export function buildFullstackBridge(
           if (!services.includes(name)) services.push(name);
           const resolved = resolveImportPath(importPath, filePath);
           if (resolved) {
+            serviceFiles[name] = path.relative(rootDir, resolved).replace(/\\/g, "/");
             const svcContent = getFileContentCached(resolved);
             if (svcContent) extraContents.push(svcContent);
           }
@@ -994,7 +999,7 @@ export function buildFullstackBridge(
       }
     });
 
-    return { services, serviceCalls, extraContents };
+    return { services, serviceCalls, extraContents, serviceFiles };
   }
 
   files.forEach(filePath => {
@@ -1029,12 +1034,14 @@ export function buildFullstackBridge(
         let connectedModels: string[] = [];
         let domainServices: string[] = [];
         let serviceCalls: string[] = [];
+        let svcFilesApi: Record<string, string> = {};
 
         if (matchingEndpoint) {
           const epContent = getFileContentCached(matchingEndpoint.filePath);
           const svcInfo = extractDomainServices(epContent, matchingEndpoint.filePath);
           domainServices = svcInfo.services;
           serviceCalls = svcInfo.serviceCalls;
+          svcFilesApi = svcInfo.serviceFiles;
           const combinedContent = [epContent, ...svcInfo.extraContents].join("\n");
 
           if (driftCollector && matchingEndpoint.filePath) {
@@ -1072,6 +1079,9 @@ export function buildFullstackBridge(
           connectedModels,
           domainServices,
           serviceCalls,
+          backendFile: matchingEndpoint?.relativePath,
+          backendLine: matchingEndpoint?.line,
+          serviceFiles: svcFilesApi,
           externalService: rawTarget.includes("stripe") ? "Stripe" : rawTarget.includes("resend") ? "Resend" : undefined,
         });
       }
@@ -1103,6 +1113,9 @@ export function buildFullstackBridge(
             connectedModels,
             domainServices: svcInfo.services,
             serviceCalls: svcInfo.serviceCalls,
+            backendFile: action.relativePath,
+            backendLine: action.line,
+            serviceFiles: svcInfo.serviceFiles,
             externalService: action.externalServices[0],
           });
         }
@@ -1594,41 +1607,79 @@ export function writeBackendAtlas(result: BackendAuditResult, rootDir: string = 
     });
   });
 
-  const nodeMap = new Map<string, { id: string; label: string; type: string }>();
+  const nodeMap = new Map<string, { id: string; label: string; type: string; source?: string; line?: number }>();
   const links: { source: string; target: string; type: string }[] = [];
 
-  const addNode = (id: string, label: string, type: string) => {
+  const addNode = (id: string, label: string, type: string, source?: string, line?: number) => {
     if (!id || id === "-") return;
-    if (!nodeMap.has(id)) {
-      nodeMap.set(id, { id, label, type });
+    const ex = nodeMap.get(id);
+    if (!ex) {
+      nodeMap.set(id, { id, label, type, ...(source ? { source, line: line || 1 } : {}) });
+    } else if (!ex.source && source) {
+      ex.source = source;
+      ex.line = line || 1;
     }
   };
 
+  // Generic file names collapse many components into one node: disambiguate with a repo-relative path.
+  const GENERIC = new Set(["page", "layout", "route", "index", "loading", "error", "template", "default", "not-found", "head", "main", "app"]);
+  const baseOf = (f: string) => path.basename(f).replace(/\.[^/.]+$/, "");
+  const baseCount = new Map<string, Set<string>>();
   result.bridgeItems.forEach(b => {
-    const uiName = path.basename(b.frontendFile).replace(/\.[^/.]+$/, "");
-    addNode(uiName, uiName, "component");
-    addNode(b.backendTarget, b.backendTarget, b.targetType === "Server Action" ? "server_action" : "api_endpoint");
-    links.push({ source: uiName, target: b.backendTarget, type: "calls" });
+    const k = baseOf(b.frontendFile);
+    if (!baseCount.has(k)) baseCount.set(k, new Set());
+    baseCount.get(k)!.add(b.frontendFile);
+  });
+  const componentId = (file: string): { id: string; label: string } => {
+    const base = baseOf(file);
+    const f = file.replace(/\\/g, "/");
+    const dup = (baseCount.get(base)?.size || 0) > 1;
+    if (!GENERIC.has(base.toLowerCase()) && !dup) return { id: base, label: base };
+    const id = f.replace(/\.[^/.]+$/, "");
+    const label = GENERIC.has(base.toLowerCase()) ? `${path.basename(path.dirname(f))}/${base}` : base;
+    return { id, label };
+  };
+  // Endpoint ids: drop query strings, hash fragments and template-literal tails; dedupe variants.
+  const cleanEndpoint = (t: string): string => {
+    let c = t.split("?")[0].split("#")[0].replace(/\$\{[^}]*\}.*$/, "").replace(/\/+$/, "");
+    c = c.replace(/\/\$$/, "");
+    return c || t;
+  };
+  const modelByName = new Map(result.models.map(m => [m.name, m]));
+  const dedupe = (arr: string[]) => Array.from(new Set(arr));
 
-    (b.serviceCalls || []).forEach(s => {
-      addNode(s, s, "service");
-      links.push({ source: b.backendTarget, target: s, type: "delegates" });
+  result.bridgeItems.forEach(b => {
+    const ui = componentId(b.frontendFile);
+    addNode(ui.id, ui.label, "component", b.frontendFile, b.frontendLine);
+    const isAction = b.targetType === "Server Action";
+    const target = isAction ? b.backendTarget : cleanEndpoint(b.backendTarget);
+    addNode(target, target, isAction ? "server_action" : "api_endpoint", b.backendFile, b.backendLine);
+    links.push({ source: ui.id, target, type: "calls" });
+
+    dedupe(b.serviceCalls || []).forEach(s => {
+      const svcFile = (b.serviceFiles || {})[s.split(/[.(]/)[0]];
+      addNode(s, s, "service", svcFile, 1);
+      links.push({ source: target, target: s, type: "delegates" });
     });
 
-    (b.connectedModels || []).forEach(m => {
-      addNode(m, m, "db_model");
-      links.push({ source: b.backendTarget, target: m, type: "mutates" });
+    dedupe(b.connectedModels || []).forEach(m => {
+      const dm = modelByName.get(m);
+      addNode(m, m, "db_model", dm?.relativePath, dm?.line);
+      links.push({ source: target, target: m, type: "mutates" });
     });
 
     if (b.externalService) {
       addNode(b.externalService, b.externalService, "integration");
-      links.push({ source: b.backendTarget, target: b.externalService, type: "uses" });
+      links.push({ source: target, target: b.externalService, type: "uses" });
     }
   });
+  // Drop duplicate links produced by merged endpoint variants.
+  const seenLinks = new Set<string>();
+  const uniqLinks = links.filter(l => { const k = `${l.source}|${l.type}|${l.target}`; if (seenLinks.has(k)) return false; seenLinks.add(k); return true; });
 
   const causalGraph = {
     nodes: Array.from(nodeMap.values()),
-    links,
+    links: uniqLinks,
   };
 
   const backendIndex = {
