@@ -8,6 +8,29 @@
     "fullstack-audit": "./bin/audit.js",
     "frontend-audit": "./bin/audit.js"
   },
+  "files": [
+    "bin/",
+    "dist/",
+    "scripts/*.ts",
+    "scripts/install.sh",
+    "scripts/install.ps1",
+    "!scripts/benchmark*",
+    "!scripts/test-frameworks.ts",
+    "hooks/",
+    "hooks.json",
+    "rules/",
+    "skills/",
+    "plugin.json",
+    "gemini-extension.json",
+    "mcp_config.json",
+    "SKILL.md",
+    "GEMINI.md",
+    "AGENTS.md",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE",
+    "NOTICE"
+  ],
   "scripts": {
     "audit": "node bin/audit.js",
     "audit:frontend": "node bin/audit.js --frontend",
@@ -18,7 +41,9 @@
     "test": "node --import tsx --test \"test/**/*.test.mjs\"",
     "test:frameworks": "npx tsx scripts/test-frameworks.ts",
     "update": "node bin/audit.js --update",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "build": "tsc -p tsconfig.build.json",
+    "prepublishOnly": "npm run build"
   },
   "keywords": [
     "fullstack-audit",
@@ -41,7 +66,9 @@
   "author": "Eurie Paulino",
   "license": "Apache-2.0",
   "devDependencies": {
-    "@types/node": "^26.6.5",
+    "@types/node": "^26.6.5"
+  },
+  "dependencies": {
     "tsx": "^4.19.0",
     "typescript": "^5.5.0"
   }

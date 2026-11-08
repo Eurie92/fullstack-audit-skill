@@ -1,0 +1,10 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "outDir": "dist",
+    "rootDir": "scripts"
+  },
+  "include": [],
+  "files": ["scripts/mcp-server.ts"]
+}

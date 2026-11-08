@@ -1,4 +1,5 @@
 import fs from "fs";
+import { walkFiles } from "./safe-walk.js";
 import path from "path";
 import { FULLSTACK_AUDIT_VERSION, FULLSTACK_AUDIT_ENGINE, getAtlasProvenanceHeader, AtlasIndexEntry } from "./constants.js";
 
@@ -175,38 +176,11 @@ function makeFileLink(relativePath: string, line?: number, displayText?: string)
 }
 
 function getSourceFiles(dir: string, fileList: string[] = []): string[] {
-  if (!fs.existsSync(dir)) return fileList;
-  const items = fs.readdirSync(dir);
-  for (const item of items) {
-    if (
-      item === "node_modules" ||
-      item.startsWith(".next") ||
-      item.startsWith(".agent") ||
-      item === ".git" ||
-      item === "dist" ||
-      item === "build" ||
-      item === ".turbo" ||
-      item === ".cache" ||
-      item === "coverage" ||
-      item === "docs" ||
-      item === "evidence" ||
-      item === "screenshots"
-    ) {
-      continue;
-    }
-    const fullPath = path.join(dir, item);
-    try {
-      const stat = fs.statSync(fullPath);
-      if (stat.isDirectory()) {
-        getSourceFiles(fullPath, fileList);
-      } else if (/\.(tsx|jsx|ts|js|mjs|cjs|prisma|sql)$/.test(item)) {
-        fileList.push(fullPath);
-      }
-    } catch {
-      continue;
-    }
-  }
-  return fileList;
+  const SKIP = new Set(["node_modules", ".git", "dist", "build", ".turbo", ".cache", "coverage", "docs", "evidence", "screenshots"]);
+  return walkFiles(dir, {
+    skipDir: (item) => SKIP.has(item) || item.startsWith(".next") || item.startsWith(".agent"),
+    acceptFile: (item) => /\.(tsx|jsx|ts|js|mjs|cjs|prisma|sql)$/.test(item),
+  }, fileList);
 }
 
 // 1. Static API Route Parser

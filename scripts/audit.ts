@@ -8,6 +8,7 @@ import { fileURLToPath } from "url";
 import { runUniversalBackendAudit } from "./audit-backend.js";
 import { applyUnifiedDiff, batchReplaceTokens } from "./precision-patcher.js";
 import { isInsideRoot } from "../bin/path-contained.js";
+import { walkFiles } from "./safe-walk.js";
 import { runAdaptiveAudit } from "./adaptive-sniffer.js";
 import { catalogReferenceRepos } from "./reference-cataloger.js";
 import {
@@ -707,26 +708,14 @@ function determineZone(relPath: string, structure: ProjectStructure): string {
 
 // 3. Scan Files (.tsx, .jsx, .ts, .js, .vue, .astro, .svelte)
 function getFiles(dir: string, fileList: string[] = []): string[] {
-  if (!fs.existsSync(dir)) return fileList;
-  const items = fs.readdirSync(dir);
-  for (const item of items) {
-    const fullPath = path.join(dir, item);
-    const stat = fs.statSync(fullPath);
-    if (stat.isDirectory()) {
-      if (
-        !item.startsWith(".next") &&
-        !item.startsWith(".git") &&
-        !item.startsWith(".turbo") &&
-        !item.startsWith(".agent") &&
-        ![
-          "node_modules", "dist", "build", "cloned-repos",
-          ".svelte-kit", ".nuxt", ".astro", ".react-router", ".cache", ".output"
-        ].includes(item)
-      ) {
-        getFiles(fullPath, fileList);
-      }
-    } else if (
-      (
+  return walkFiles(dir, {
+    skipDir: (item) =>
+      item.startsWith(".next") || item === ".git" || item.startsWith(".turbo") || item.startsWith(".agent") ||
+      [
+        "node_modules", "dist", "build", "cloned-repos",
+        ".svelte-kit", ".nuxt", ".astro", ".react-router", ".cache", ".output"
+      ].includes(item),
+    acceptFile: (item) => ((
         item.endsWith(".tsx") || item.endsWith(".jsx") || item.endsWith(".ts") || item.endsWith(".js") ||
         item.endsWith(".vue") || item.endsWith(".astro") || item.endsWith(".svelte") ||
         item.endsWith(".svelte.ts") || item.endsWith(".svelte.js")
@@ -748,12 +737,8 @@ function getFiles(dir: string, fileList: string[] = []): string[] {
       !item.endsWith(".config.js") &&
       !item.endsWith(".config.ts") &&
       !item.endsWith(".config.mjs") &&
-      !item.endsWith(".config.cjs")
-    ) {
-      fileList.push(fullPath);
-    }
-  }
-  return fileList;
+      !item.endsWith(".config.cjs")),
+  }, fileList);
 }
 
 // Pure black/white are never drift. Brand colors belong in CSS variables / theme config, which are skipped below.

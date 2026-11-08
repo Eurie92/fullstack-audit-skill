@@ -18,6 +18,7 @@ import fs from "fs";
 import path from "path";
 import readline from "readline";
 import child_process from "child_process";
+import { fileURLToPath } from "url";
 import { FULLSTACK_AUDIT_VERSION, FULLSTACK_AUDIT_ENGINE, tokenizeCodeIdentifier, expandSynonyms, AtlasIndex } from "./constants.js";
 import { applyUnifiedDiff, batchReplaceTokens } from "./precision-patcher.js";
 import { isInsideRoot } from "../bin/path-contained.js";
@@ -25,6 +26,8 @@ import { runAdaptiveAudit } from "./adaptive-sniffer.js";
 import { catalogReferenceRepos } from "./reference-cataloger.js";
 
 // Ensure all diagnostic logging goes strictly to stderr. stdout is exclusively for JSON-RPC 2.0.
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
 function logDebug(msg: string) {
   process.stderr.write(`[fullstack-audit-mcp] ${msg}\n`);
 }
@@ -174,7 +177,7 @@ function getFilesRecursively(dir: string, fileList: string[], maxFiles = 3000) {
 }
 
 // 1. Tool: fullstack_find
-function toolFind(query: string, projectRoot?: string, compact = true): { content: string; isError: boolean } {
+export function toolFind(query: string, projectRoot?: string, compact = true): { content: string; isError: boolean } {
   const root = resolveProjectRoot(projectRoot);
   const q = (query || "").toLowerCase().trim();
 
@@ -271,7 +274,7 @@ function toolFind(query: string, projectRoot?: string, compact = true): { conten
 }
 
 // 2. Tool: fullstack_locate_visual
-function toolLocateVisual(query: string, projectRoot?: string): { content: string; isError: boolean } {
+export function toolLocateVisual(query: string, projectRoot?: string): { content: string; isError: boolean } {
   const root = resolveProjectRoot(projectRoot);
   const q = (query || "").toLowerCase().trim();
 
@@ -348,7 +351,7 @@ function toolLocateVisual(query: string, projectRoot?: string): { content: strin
 }
 
 // 3. Tool: fullstack_resolve
-function toolResolve(name: string, projectRoot?: string): { content: string; isError: boolean } {
+export function toolResolve(name: string, projectRoot?: string): { content: string; isError: boolean } {
   const root = resolveProjectRoot(projectRoot);
   const qRaw = (name || "").trim();
   if (!qRaw) return { content: "❌ Name parameter cannot be empty.", isError: true };
@@ -405,7 +408,7 @@ function toolResolve(name: string, projectRoot?: string): { content: string; isE
 }
 
 // 4. Tool: fullstack_path
-function toolCausalPath(from: string, to: string, projectRoot?: string): { content: string; isError: boolean } {
+export function toolCausalPath(from: string, to: string, projectRoot?: string): { content: string; isError: boolean } {
   const root = resolveProjectRoot(projectRoot);
   if (!from || !to) return { content: "❌ Both 'from' and 'to' parameters are required.", isError: true };
 
@@ -530,7 +533,7 @@ function toolCausalPath(from: string, to: string, projectRoot?: string): { conte
 }
 
 // 5. Tool: fullstack_symbol
-function toolSymbolSlices(symbolName: string, projectRoot?: string): { content: string; isError: boolean } {
+export function toolSymbolSlices(symbolName: string, projectRoot?: string): { content: string; isError: boolean } {
   const root = resolveProjectRoot(projectRoot);
   if (!symbolName) return { content: "❌ Symbol parameter cannot be empty.", isError: true };
 
@@ -1078,9 +1081,4 @@ export function startMcpServer() {
     logDebug("MCP Server stdio stream closed. Exiting process.");
     process.exit(0);
   });
-}
-
-// Run server directly if invoked as main process
-if (process.argv[1] && (process.argv[1].endsWith("mcp-server.ts") || process.argv[1].endsWith("mcp-server.js"))) {
-  startMcpServer();
 }

@@ -70,6 +70,9 @@ curl -fsSL "$BASE_URL/scripts/constants.ts" -o "$TARGET_DIR/scripts/constants.ts
 for f in precision-patcher.ts adaptive-sniffer.ts reference-cataloger.ts; do curl -fsSL "$BASE_URL/scripts/$f" -o "$TARGET_DIR/scripts/$f"; done
 curl -fsSL "$BASE_URL/bin/audit.js" -o "$TARGET_DIR/bin/audit.js"
 curl -fsSL "$BASE_URL/bin/path-contained.js" -o "$TARGET_DIR/bin/path-contained.js"
+curl -fsSL "$BASE_URL/bin/mcp-server.js" -o "$TARGET_DIR/bin/mcp-server.js"
+mkdir -p "$TARGET_DIR/dist"
+for f in mcp-server constants precision-patcher adaptive-sniffer reference-cataloger; do curl -fsSL "$BASE_URL/dist/$f.js" -o "$TARGET_DIR/dist/$f.js"; done
 
 # Construct rule block (same text as generateDynamicRuleBlock in scripts/audit.ts)
 RULE_BLOCK="$(cat <<'RULE_EOF'
@@ -118,7 +121,7 @@ RULE_EOF
 RULE_BLOCK+=$'\n'"$(cat <<'RULE_EOF'
 
 ### Commands
-- MCP tools: `fullstack_find`, `fullstack_locate_visual`, `fullstack_resolve`, `fullstack_path`, `fullstack_symbol`, `fullstack_patch`, `fullstack_audit`
+- MCP tools: `fullstack_find`, `fullstack_locate_visual`, `fullstack_resolve`, `fullstack_path`, `fullstack_symbol`, `fullstack_patch`, `fullstack_audit`, `fullstack_patch_apply`, `fullstack_batch_replace`, `fullstack_reference`
 - `/fullstack-audit` or `npx fullstack-audit`: rebuild the atlas and `docs/llms.txt`
 - `npx fullstack-audit --theme --route <route> --compact`: design-token punchlist for one route
 - `npx fullstack-audit --verify --gate-clean`: typecheck and atlas gate

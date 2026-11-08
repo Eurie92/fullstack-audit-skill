@@ -75,6 +75,13 @@ $BinDir = Join-Path $TargetDir "bin"
 if (-not (Test-Path $BinDir)) { New-Item -ItemType Directory -Force -Path $BinDir | Out-Null }
 Invoke-WebRequest -Uri "$BaseUrl/bin/audit.js" -OutFile (Join-Path $BinDir "audit.js")
 Invoke-WebRequest -Uri "$BaseUrl/bin/path-contained.js" -OutFile (Join-Path $BinDir "path-contained.js")
+Invoke-WebRequest -Uri "$BaseUrl/bin/mcp-server.js" -OutFile (Join-Path $BinDir "mcp-server.js")
+
+$DistDir = Join-Path $TargetDir "dist"
+if (-not (Test-Path $DistDir)) { New-Item -ItemType Directory -Force -Path $DistDir | Out-Null }
+foreach ($f in @("mcp-server", "constants", "precision-patcher", "adaptive-sniffer", "reference-cataloger")) {
+    Invoke-WebRequest -Uri "$BaseUrl/dist/$f.js" -OutFile (Join-Path $DistDir "$f.js")
+}
 
 # Construct rule block (same text as generateDynamicRuleBlock in scripts/audit.ts)
 $RuleParts = [System.Collections.Generic.List[string]]::new()
@@ -120,7 +127,7 @@ if ($enableCaveman) { $RuleParts.Add(@'
 $RuleParts.Add(@'
 
 ### Commands
-- MCP tools: `fullstack_find`, `fullstack_locate_visual`, `fullstack_resolve`, `fullstack_path`, `fullstack_symbol`, `fullstack_patch`, `fullstack_audit`
+- MCP tools: `fullstack_find`, `fullstack_locate_visual`, `fullstack_resolve`, `fullstack_path`, `fullstack_symbol`, `fullstack_patch`, `fullstack_audit`, `fullstack_patch_apply`, `fullstack_batch_replace`, `fullstack_reference`
 - `/fullstack-audit` or `npx fullstack-audit`: rebuild the atlas and `docs/llms.txt`
 - `npx fullstack-audit --theme --route <route> --compact`: design-token punchlist for one route
 - `npx fullstack-audit --verify --gate-clean`: typecheck and atlas gate

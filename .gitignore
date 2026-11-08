@@ -1,5 +1,7 @@
 node_modules/
 dist/
+# Root dist/ is the committed MCP build (npm run build); a test keeps it fresh.
+!/dist/
 .next/
 *.log
 .DS_Store

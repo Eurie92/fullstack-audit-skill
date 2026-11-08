@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { spawn } from "child_process";
+import { spawn, spawnSync } from "child_process";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -20,6 +20,64 @@ if (args.includes("-v") || args.includes("--version")) {
   }
   process.exit(0);
 }
+
+// Fast path: atlas lookups served from the compiled MCP tools (no tsx cold start).
+function argAfter(...flags) {
+  for (const f of flags) {
+    const i = args.indexOf(f);
+    if (i !== -1) return { i, v: args[i + 1] };
+  }
+  return null;
+}
+
+function liveSearch(query) {
+  const probe = spawnSync("rg", ["--version"], { stdio: "ignore", shell: false });
+  if (probe.error || probe.status !== 0) return false;
+  const rgArgs = ["-F", "-S", "-n", "--no-heading", "--max-count", "3", "--max-columns", "200"];
+  for (const d of ["node_modules", "dist", "docs", ".next", ".git", "cloned-repos"]) rgArgs.push("-g", `!${d}`);
+  rgArgs.push("--", query, ".");
+  const r = spawnSync("rg", rgArgs, { cwd: process.cwd(), encoding: "utf-8", shell: false, maxBuffer: 10 * 1024 * 1024 });
+  const lines = (r.stdout || "").split(/\r?\n/).filter(Boolean);
+  if (!lines.length) return false;
+  console.log("live search (rg, not from atlas index):");
+  console.log(lines.slice(0, 20).join("\n"));
+  if (lines.length > 20) console.log(`... (+${lines.length - 20} more lines)`);
+  return true;
+}
+
+async function tryFastPath() {
+  if (args.some((a) => ["--diff", "--theme", "--verify", "--fix-buttons", "--dead", "--rag"].includes(a))) return null;
+  const root = process.cwd();
+  if (!fs.existsSync(path.join(root, "docs", "frontend-atlas", ".atlas-index.json"))) return null;
+  const compact = args.includes("--compact") || args.includes("--json");
+  let call;
+  const find = argAfter("--find", "-f");
+  const vis = argAfter("--locate-visual", "--visual");
+  const res = argAfter("--resolve");
+  const sym = argAfter("--symbol");
+  const pth = argAfter("--path");
+  if (pth) { if (!pth.v || !args[pth.i + 2]) return null; call = (m) => m.toolCausalPath(pth.v, args[pth.i + 2], root); }
+  else if (find) { if (!find.v || !compact) return null; call = (m) => m.toolFind(find.v, root, true); }
+  else if (vis) { if (!vis.v) return null; call = (m) => m.toolLocateVisual(vis.v, root); }
+  else if (res) { if (!res.v) return null; call = (m) => m.toolResolve(res.v, root); }
+  else if (sym) { if (!sym.v) return null; call = (m) => m.toolSymbolSlices(sym.v, root); }
+  else return null;
+  let r;
+  try {
+    const mod = await import("../dist/mcp-server.js");
+    r = call(mod);
+  } catch {
+    return null;
+  }
+  if (!r || /\[Atlas Not Found\]/.test(r.content)) return null;
+  const miss = r.isError || /^ZERO_MATCH/.test(r.content) || r.content.startsWith("❌");
+  console.log(r.content);
+  if (miss && find && liveSearch(find.v)) return 0;
+  return miss ? 1 : 0;
+}
+
+const fastCode = await tryFastPath();
+if (fastCode !== null) process.exit(fastCode);
 
 const scriptPath = path.resolve(__dirname, "../scripts/audit.ts");
 

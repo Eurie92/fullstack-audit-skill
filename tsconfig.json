@@ -9,5 +9,6 @@
     "forceConsistentCasingInFileNames": true,
     "noEmit": true
   },
-  "include": ["scripts/**/*", "bin/**/*"]
+  "include": ["scripts/**/*", "bin/**/*"],
+  "exclude": ["dist", "node_modules"]
 }
