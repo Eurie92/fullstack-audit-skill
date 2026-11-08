@@ -110,6 +110,16 @@ Fullstack Audit answers these from a pre-built atlas, through MCP tools that ret
 
 On Windows it also helps avoid one real trap: `Get-ChildItem -Recurse` on the project root walks `node_modules/` and `.next/` and can freeze for many seconds. An optional hook blocks only that case.
 
+### Where it helps most
+
+| Harness | How much it helps | Why |
+|---|---|---|
+| **Antigravity** | **Most.** In day-to-day use it is the biggest help here (from use, not yet benchmarked). | The agent tends to search with shell folder walks (`run_command`), which are slow on Windows and can freeze under Defender. The atlas replaces many of those walks with one lookup. |
+| **Claude Code** | **Mainly for tracing.** Measured: 92% vs 75% success on page → API → DB questions; no gain on simple "where is X" lookups (see [Benchmarks](#benchmarks)). | Its built-in Grep (ripgrep) is already fast and skips `node_modules`, so for single-string lookups the atlas only adds a step. |
+| **Cursor, Windsurf, Codex, OpenCode** | Not measured yet. | Expect the tracing, impact and visual-lookup gains; simple lookups depend on how good the built-in search is. |
+
+Use the atlas for tracing flows, change impact, visual elements and unfamiliar code. Use normal search for simple string lookups.
+
 ---
 
 ## How It Works (Just Ask Your AI)
@@ -201,11 +211,21 @@ Fullstack Audit works 100% out-of-the-box on its own. For developers who want to
 
 Earlier versions (up to v2.17.0) published "1,000-run flight test" tables. Those numbers were not measured with an AI agent: token counts were fixed constants per trial, and some latencies were fixed floors or fixed offsets. They were removed in v2.17.1.
 
-What we can say today:
-* MCP lookups (`fullstack_find` and friends) read an index that the server keeps in memory, so the lookup itself is fast. The end-to-end time your agent sees also includes the MCP round trip and model time.
-* The CLI path is slower than it should be (see the CLI note above).
+### v2.17.2 A/B benchmark (Claude Code, measured)
 
-A reproducible benchmark is planned: real tasks on a public Next.js app, run in Claude Code with and without the plugin, reporting success rate, real token usage, tool calls and wall time, with raw logs committed.
+24 tasks on a real Next.js SaaS app (pinned commit), Claude Code headless with Sonnet, with and without the plugin, 3 runs each. The run was stopped at 120 of 144 runs. Harness, tasks and raw logs: [`bench/`](bench/) and [`bench/results/full-2.17.2/`](bench/results/full-2.17.2/).
+
+| Task type | Success with | Success without | Median tokens with / without |
+|---|---|---|---|
+| All | 79% | 77% | 5,168 / 3,526 |
+| Trace (UI → API → DB) | **92%** | 75% | 9,604 / 10,165 |
+| Locate ("where is X") | 87% | 90% | 5,735 / 2,881 |
+| Impact ("what uses X") | 100% | 100% | 4,925 / 5,056 |
+| Edit | 40% | 40% | 1,444 / 829 |
+
+What this means: in Claude Code the atlas clearly helps multi-hop tracing, and costs extra on simple lookups because the agent still double-checks with Grep. The edit-task checks are likely too strict (both arms score the same 40%) and are being reviewed. Antigravity has not been benchmarked yet.
+
+Lookup speed: `fullstack-audit --find` takes about 0.13 s from the CLI; MCP lookups take milliseconds because the index stays in memory.
 
 ---
 
