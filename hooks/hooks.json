@@ -1,5 +1,5 @@
 {
-  "description": "Blocks unscoped recursive directory walks from Windows shells (Get-ChildItem -Recurse, dir /s) that freeze under Windows Defender.",
+  "description": "Iron Gate: blocks unscoped recursive directory walks from Windows shells (they freeze under Windows Defender). Refresh: re-runs the audit in the background after the agent edits source files, so the atlas follows its edits.",
   "hooks": {
     "PreToolUse": [
       {
@@ -8,6 +8,18 @@
           {
             "type": "command",
             "command": "node \"${CLAUDE_PLUGIN_ROOT}/bin/iron-gate-hook.js\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/bin/refresh-hook.js\"",
             "timeout": 5
           }
         ]

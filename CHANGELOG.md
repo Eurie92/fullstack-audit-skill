@@ -21,6 +21,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 * **MCP result caches survived a re-audit**: the find/visual/path LRU caches are now cleared when the index file is regenerated.
 * **Installers skipped `scripts/safe-walk.ts`** (imported by `audit.ts`) and now fetch it plus `freshness.ts` and `dist/freshness.js`.
 
+### Added
+* **Atlas follows the agent's edits**: new `PostToolUse` hook on `Edit|Write|MultiEdit` (`bin/refresh-hook.js`, wired in `hooks/hooks.json`). It returns at once and starts a detached worker that waits 1.5 s for edits to settle, then re-runs the full audit under a lock (edits during a run queue one more run). It only fires for source files in projects that already have an atlas. Opt out with `FULLSTACK_AUDIT_NO_REFRESH=1`. Covered by `test/refresh-hook.test.mjs`.
+
 ### Changed
 * **Fast CLI lookups**: `--find --compact`, `--locate-visual`, `--resolve`, `--path` and `--symbol` are served from the compiled MCP tools instead of spawning tsx (`--find "benchmark" --compact`: 2,803 ms → ~130 ms median). Other commands still use tsx.
 * **One MCP server source**: `scripts/mcp-server.ts` is compiled to a committed `dist/` (`npm run build`, `tsconfig.build.json`); `bin/mcp-server.js` is now a shim, so all 10 tools ship (adds `fullstack_patch_apply`, `fullstack_batch_replace`, `fullstack_reference`). `test/dist-fresh.test.mjs` fails if `dist/` is stale.
