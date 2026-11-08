@@ -1,0 +1,284 @@
+[
+ {
+  "id": "t01",
+  "category": "locate",
+  "prompt": "Where is the modal heading that says \"INSTANT SOURCING PING\" implemented?",
+  "check": {
+   "type": "answer-contains",
+   "all": [
+    "restock-alert-modal"
+   ]
+  }
+ },
+ {
+  "id": "t02",
+  "category": "locate",
+  "prompt": "Where is the storefront FAQ entry \"Where do I find my purchases?\" defined?",
+  "check": {
+   "type": "answer-contains",
+   "all": [
+    "storefront-buying-help"
+   ]
+  }
+ },
+ {
+  "id": "t03",
+  "category": "locate",
+  "prompt": "Where is the countdown timer shown for pending orders in the admin area implemented?",
+  "check": {
+   "type": "answer-contains",
+   "all": [
+    "admin/OrderCountdown"
+   ]
+  }
+ },
+ {
+  "id": "t04",
+  "category": "locate",
+  "prompt": "Where does the server verify the Cloudflare Turnstile captcha token?",
+  "check": {
+   "type": "answer-contains",
+   "all": [
+    "auth/captcha"
+   ],
+   "any": [
+    "verifyTurnstileToken"
+   ]
+  }
+ },
+ {
+  "id": "t05",
+  "category": "locate",
+  "prompt": "Where is the logic that detects activation links and builds the copyable text for delivered credentials?",
+  "check": {
+   "type": "answer-contains",
+   "all": [
+    "credential-formatter"
+   ]
+  }
+ },
+ {
+  "id": "t06",
+  "category": "locate",
+  "prompt": "Where are the order and reservation state machines (valid status transitions) defined?",
+  "check": {
+   "type": "answer-contains",
+   "all": [
+    "domain/state-machines"
+   ]
+  }
+ },
+ {
+  "id": "t07",
+  "category": "locate",
+  "prompt": "Where is the dedicated Telegram webhook endpoint route defined?",
+  "check": {
+   "type": "answer-contains",
+   "all": [
+    "telegram/webhook"
+   ]
+  }
+ },
+ {
+  "id": "t08",
+  "category": "locate",
+  "prompt": "Where is the background music player component for the public site implemented?",
+  "check": {
+   "type": "answer-contains",
+   "all": [
+    "background-music-player"
+   ]
+  }
+ },
+ {
+  "id": "t09",
+  "category": "trace",
+  "prompt": "On the reseller wallet page, trace what happens when the user starts a P2P top-up: which API route is called, which service allocates the unique centavos match, and which DB table stores the payment session?",
+  "check": {
+   "type": "answer-contains",
+   "all": [
+    "payment/p2p/create",
+    "centavos-allocator",
+    "p2p_payment_sessions"
+   ]
+  }
+ },
+ {
+  "id": "t10",
+  "category": "trace",
+  "prompt": "In admin settings, when an admin adds or removes a staff member, which API route handles it and which DB table is written?",
+  "check": {
+   "type": "answer-contains",
+   "all": [
+    "api/admin/staff",
+    "app_users"
+   ]
+  }
+ },
+ {
+  "id": "t11",
+  "category": "trace",
+  "prompt": "The public storefront vending floor shows dispensers/slots. Trace from the showcase component to the API route, the service, and the DB table that supplies the slot data.",
+  "check": {
+   "type": "answer-contains",
+   "all": [
+    "api/public/vending-slots",
+    "vending-slot.service",
+    "vending_slots"
+   ]
+  }
+ },
+ {
+  "id": "t12",
+  "category": "trace",
+  "prompt": "Trace the forgot-password flow: which API route does the page submit to, and which auth function actually requests the recovery email?",
+  "check": {
+   "type": "answer-contains",
+   "all": [
+    "password/recover",
+    "requestPasswordRecovery"
+   ]
+  }
+ },
+ {
+  "id": "t13",
+  "category": "trace",
+  "prompt": "When a user submits the restock notification form, which API route receives it and where does that route persist the request (which table/collection)?",
+  "check": {
+   "type": "answer-contains",
+   "all": [
+    "restock-alert",
+    "audit_log"
+   ]
+  }
+ },
+ {
+  "id": "t14",
+  "category": "trace",
+  "prompt": "When a customer archives an order from their vault drawer, which API route is called, which service handles it, and which table stores the archive records?",
+  "check": {
+   "type": "answer-contains",
+   "all": [
+    "orders/archive",
+    "customer-purchase.service",
+    "customer_order_archives"
+   ]
+  }
+ },
+ {
+  "id": "t15",
+  "category": "impact",
+  "prompt": "If I change the props of the TelegramLinkWidget component, which pages will be affected?",
+  "check": {
+   "type": "answer-contains",
+   "all": [
+    "portal/reseller/page.tsx",
+    "portal/supplier/page.tsx"
+   ]
+  }
+ },
+ {
+  "id": "t16",
+  "category": "impact",
+  "prompt": "What pages use the CredentialRevealModal component, i.e. what breaks if I change its API?",
+  "check": {
+   "type": "answer-contains",
+   "all": [
+    "reseller/catalog/page.tsx",
+    "reseller/orders/page.tsx",
+    "portal/reseller/page.tsx"
+   ]
+  }
+ },
+ {
+  "id": "t17",
+  "category": "impact",
+  "prompt": "Which files import the shared overlay layer (z-index) constants module? I want to change a layer value.",
+  "check": {
+   "type": "answer-contains",
+   "all": [
+    "account-menu",
+    "shared-mobile-drawer",
+    "ui/modal",
+    "ui/combobox"
+   ]
+  }
+ },
+ {
+  "id": "t18",
+  "category": "impact",
+  "prompt": "Which files render or import the restock alert modal component?",
+  "check": {
+   "type": "answer-contains",
+   "all": [
+    "reseller/catalog/page.tsx",
+    "ModalLauncherTab",
+    "VendingCheckoutTab"
+   ]
+  }
+ },
+ {
+  "id": "t19",
+  "category": "impact",
+  "prompt": "If I change the state machine module's transition rules, which inventory services depend on it?",
+  "check": {
+   "type": "answer-contains",
+   "all": [
+    "catalog.service",
+    "defect.service",
+    "inventory.service",
+    "reservation.service"
+   ]
+  }
+ },
+ {
+  "id": "t20",
+  "category": "edit",
+  "prompt": "Change the storefront hero button label \"Explore 12 Dispensers\" to \"Browse All Dispensers\".",
+  "check": {
+   "type": "file-contains",
+   "file": "components/public/storefront-hero.tsx",
+   "pattern": "<span>Browse All Dispensers</span>"
+  }
+ },
+ {
+  "id": "t21",
+  "category": "edit",
+  "prompt": "In the restock alert modal, change the submit button text \"Notify Me on Restock\" to \"Alert Me When Back\".",
+  "check": {
+   "type": "file-contains",
+   "file": "components/public/restock-alert-modal.tsx",
+   "pattern": "<span>Alert Me When Back</span>"
+  }
+ },
+ {
+  "id": "t22",
+  "category": "edit",
+  "prompt": "On the storefront trust bar, rename the \"Private Solo Access\" title to \"Exclusive Solo Access\".",
+  "check": {
+   "type": "file-contains",
+   "file": "components/public/storefront-trust-bar.tsx",
+   "pattern": "title:s*\"Exclusive Solo Access\""
+  }
+ },
+ {
+  "id": "t23",
+  "category": "edit",
+  "prompt": "On the storefront trust bar, change the title \"Immediate Delivery\" to \"Instant Delivery\".",
+  "check": {
+   "type": "file-contains",
+   "file": "components/public/storefront-trust-bar.tsx",
+   "pattern": "title:s*\"Instant Delivery\""
+  }
+ },
+ {
+  "id": "t24",
+  "category": "edit",
+  "prompt": "In the storefront buying help FAQ, change the question \"How long do I have to pay?\" to \"How much time do I have to pay?\".",
+  "check": {
+   "type": "file-contains",
+   "file": "components/public/storefront-buying-help.tsx",
+   "pattern": "question:s*\"How much time do I have to pay?\""
+  }
+ }
+]
