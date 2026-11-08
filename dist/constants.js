@@ -2,9 +2,9 @@
  * Centralized Constants for fullstack-audit-skill
  * Single source of truth for versioning, engine metadata, and harness definitions.
  */
-export const FULLSTACK_AUDIT_VERSION = "2.17.1";
-export const FULLSTACK_AUDIT_ENGINE = "Living Fullstack Atlas & Precision Adaptive Engine v2.17.1";
-export const FULLSTACK_AUDIT_RELEASE_DATE = "2026-11-08";
+export const FULLSTACK_AUDIT_VERSION = "2.17.2";
+export const FULLSTACK_AUDIT_ENGINE = "Living Fullstack Atlas & Precision Adaptive Engine v2.17.2";
+export const FULLSTACK_AUDIT_RELEASE_DATE = "2026-11-09";
 export function getVersionBanner() {
     return `fullstack-audit v${FULLSTACK_AUDIT_VERSION} (engine: ${FULLSTACK_AUDIT_ENGINE}, released: ${FULLSTACK_AUDIT_RELEASE_DATE})`;
 }

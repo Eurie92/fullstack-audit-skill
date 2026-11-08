@@ -6,7 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
-## [2.17.2] - Unreleased
+## [2.17.2] - 2026-11-09
 
 ### Fixed
 * **`batchReplaceTokens` with an empty target rewrote up to 500 files**: it now throws on an empty `target` before touching anything.
@@ -28,6 +28,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 * **`fullstack_component <name>`**: props, cva variants and usage count for a component, flagged `[EXISTS]` so an agent can check before building a new one. Needs a fresh audit (`components[]` in the index).
 * **`fullstack_find` `activeFile`**: optional context ranking that boosts hits in the same file, a graph neighbour, or the same directory. Output without it is unchanged.
 * **`--setup-*` adds `next-devtools-mcp`** next to our server for Next.js 16+ projects (idempotent).
+* **`bench/` harness** (Phase 4): A/B benchmark harness with 24 verified tasks for comparing agent runs with and without the atlas. Not shipped in the npm package.
 
 ### Fixed (index quality)
 * **Constants and basenames were listed as components** (`XNIGHT_ROOT`, `TOOL_DEFINITIONS`): a COMPONENT now needs a PascalCase function/arrow/`forwardRef`/`memo` that returns JSX.

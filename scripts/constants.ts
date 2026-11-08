@@ -3,9 +3,9 @@
  * Single source of truth for versioning, engine metadata, and harness definitions.
  */
 
-export const FULLSTACK_AUDIT_VERSION = "2.17.1";
-export const FULLSTACK_AUDIT_ENGINE = "Living Fullstack Atlas & Precision Adaptive Engine v2.17.1";
-export const FULLSTACK_AUDIT_RELEASE_DATE = "2026-11-08";
+export const FULLSTACK_AUDIT_VERSION = "2.17.2";
+export const FULLSTACK_AUDIT_ENGINE = "Living Fullstack Atlas & Precision Adaptive Engine v2.17.2";
+export const FULLSTACK_AUDIT_RELEASE_DATE = "2026-11-09";
 
 export type AuditProfile = "triad" | "standalone" | "custom";
 
