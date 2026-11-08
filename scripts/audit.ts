@@ -7,6 +7,7 @@ import ts from "typescript";
 import { fileURLToPath } from "url";
 import { runUniversalBackendAudit } from "./audit-backend.js";
 import { applyUnifiedDiff, batchReplaceTokens } from "./precision-patcher.js";
+import { isInsideRoot } from "../bin/path-contained.js";
 import { runAdaptiveAudit } from "./adaptive-sniffer.js";
 import { catalogReferenceRepos } from "./reference-cataloger.js";
 import {
@@ -4189,7 +4190,7 @@ export function executeSurgicalPatch(filePath: string, target?: string, replacem
 
   const resolvedRoot = path.resolve(ROOT_DIR);
   const fullPath = path.isAbsolute(filePath) ? path.resolve(filePath) : path.resolve(ROOT_DIR, filePath);
-  if (!fullPath.startsWith(resolvedRoot)) {
+  if (!isInsideRoot(resolvedRoot, fullPath)) {
     console.error(`❌ Security Error: Path traversal detected. Access outside workspace root is forbidden: ${filePath}`);
     return false;
   }

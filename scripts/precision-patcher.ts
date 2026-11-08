@@ -10,6 +10,7 @@
 
 import fs from "fs";
 import path from "path";
+import { isInsideRoot } from "../bin/path-contained.js";
 
 export interface Hunk {
   oldStart: number;
@@ -96,16 +97,19 @@ export function applyUnifiedDiff(
   projectRoot = process.cwd()
 ): { success: boolean; filePath: string; linesChanged: number; message: string } {
   const fullPath = path.isAbsolute(targetFilePath) ? targetFilePath : path.resolve(projectRoot, targetFilePath);
+  if (!isInsideRoot(projectRoot, fullPath)) {
+    throw new Error(`Path outside project root is forbidden: ${targetFilePath}`);
+  }
   const parsed = parseUnifiedDiff(patchText);
 
-  const isCreation = parsed.oldFile === "/dev/null" || !fs.existsSync(fullPath);
+  const isCreation = parsed.oldFile === "/dev/null";
 
   let originalLines: string[] = [];
   let isCrlf = false;
 
   if (!isCreation) {
     if (!fs.existsSync(fullPath)) {
-      throw new Error(`Target file does not exist: ${fullPath}`);
+      throw new Error(`file not found: ${fullPath} (use a "--- /dev/null" header to create a new file)`);
     }
     const rawContent = fs.readFileSync(fullPath, "utf-8");
     isCrlf = rawContent.includes("\r\n");
@@ -124,8 +128,21 @@ export function applyUnifiedDiff(
     const contextOldLines: string[] = [];
     const replacementNewLines: string[] = [];
 
-    for (const hLine of hunk.lines) {
-      if (hLine.startsWith(" ")) {
+    // A trailing "" is usually just the diff's final newline; drop it unless the hunk header counts it.
+    const hunkLines = [...hunk.lines];
+    while (
+      hunkLines.length > 0 &&
+      hunkLines[hunkLines.length - 1] === "" &&
+      hunkLines.filter((l) => !l.startsWith("+")).length > hunk.oldCount
+    ) {
+      hunkLines.pop();
+    }
+
+    for (const hLine of hunkLines) {
+      if (hLine === "") {
+        contextOldLines.push("");
+        replacementNewLines.push("");
+      } else if (hLine.startsWith(" ")) {
         contextOldLines.push(hLine.slice(1));
         replacementNewLines.push(hLine.slice(1));
       } else if (hLine.startsWith("-")) {
@@ -149,15 +166,18 @@ export function applyUnifiedDiff(
     } else {
       // Fuzzy search within +/- 15 lines in case file drifted slightly
       const searchRadius = 15;
-      const minIdx = Math.max(0, targetIdx - searchRadius);
-      const maxIdx = Math.min(workingLines.length - contextOldLines.length, targetIdx + searchRadius);
+      const maxStart = workingLines.length - contextOldLines.length;
+      const wanted = contextOldLines.join("\n");
 
-      for (let i = minIdx; i <= maxIdx; i++) {
-        const candidate = workingLines.slice(i, i + contextOldLines.length);
-        if (candidate.join("\n") === contextOldLines.join("\n")) {
-          matchOffset = i - targetIdx;
-          foundMatch = true;
-          break;
+      // Search outward from the expected line so the nearest candidate wins.
+      for (let d = 1; d <= searchRadius && !foundMatch; d++) {
+        for (const i of [targetIdx + d, targetIdx - d]) {
+          if (i < 0 || i > maxStart) continue;
+          if (workingLines.slice(i, i + contextOldLines.length).join("\n") === wanted) {
+            matchOffset = i - targetIdx;
+            foundMatch = true;
+            break;
+          }
         }
       }
     }
@@ -220,6 +240,9 @@ export function batchReplaceTokens(
   receipts: Array<{ file: string; occurrences: number; sampleLines: number[] }>;
   dryRun: boolean;
 } {
+  if (!target) {
+    throw new Error("batchReplaceTokens: target must be a non-empty string.");
+  }
   const root = options.projectRoot || process.cwd();
   const exts = options.fileExtensions || [".tsx", ".ts", ".jsx", ".js", ".css", ".scss", ".json", ".html"];
   const dryRun = options.dryRun ?? false;

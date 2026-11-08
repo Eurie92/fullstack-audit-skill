@@ -9,6 +9,7 @@ import path from "path";
 import readline from "readline";
 import child_process from "child_process";
 import { fileURLToPath } from "url";
+import { isInsideRoot } from "./path-contained.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -662,7 +663,7 @@ function toolSurgicalPatch(filePath, target, replacement, projectRoot) {
 
   const resolvedRoot = path.resolve(root);
   const fullPath = path.isAbsolute(filePath) ? path.resolve(filePath) : path.resolve(root, filePath);
-  if (!fullPath.startsWith(resolvedRoot)) {
+  if (!isInsideRoot(resolvedRoot, fullPath)) {
     return { content: `❌ Security Error: Path traversal forbidden. Path outside workspace root: ${filePath}`, isError: true };
   }
   if (!fs.existsSync(fullPath)) {

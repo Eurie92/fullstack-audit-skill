@@ -6,6 +6,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [2.17.2] - Unreleased
+
+### Fixed
+* **`batchReplaceTokens` with an empty target rewrote up to 500 files**: it now throws on an empty `target` before touching anything.
+* **`applyUnifiedDiff` created junk files for typo'd paths**: a new file is created only for a `--- /dev/null` header; otherwise it throws `file not found`.
+* **Path containment used `startsWith(root)`**, so `C:\proj-old` passed for root `C:\proj` and Windows drive-letter case mattered: one shared `isInsideRoot` helper (`bin/path-contained.js`, `path.relative` based) now guards `--patch` (`scripts/audit.ts`), `fullstack_patch` (`bin/mcp-server.js`, `scripts/mcp-server.ts`) and `applyUnifiedDiff`, which previously had no check. Installers fetch the helper.
+* **Blank (`""`) context lines in unified diffs broke hunk matching**: they are now treated as empty context lines.
+* **Fuzzy hunk matching took the first match in the +/-15 line window**: it now searches outward from the expected line and takes the nearest match.
+
+### Changed
+* `npm test` runs with `node --import tsx` so tests can import `scripts/*.ts`; added `test/precision-patcher.test.mjs`.
+
+---
+
 ## [2.17.1] - 2026-11-08
 
 > **Release Tier**: `PATCH (honesty, safety and agent-quality fixes from the v2.17 audit)`  

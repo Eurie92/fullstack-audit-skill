@@ -15,7 +15,7 @@
     "audit:all": "node bin/audit.js --all",
     "audit:theme": "node bin/audit.js --theme",
     "sync:plugin": "powershell -ExecutionPolicy Bypass -File scripts/sync-plugin.ps1",
-    "test": "node --test \"test/**/*.test.mjs\"",
+    "test": "node --import tsx --test \"test/**/*.test.mjs\"",
     "test:frameworks": "npx tsx scripts/test-frameworks.ts",
     "update": "node bin/audit.js --update",
     "typecheck": "tsc --noEmit"

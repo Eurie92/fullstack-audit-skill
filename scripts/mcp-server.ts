@@ -20,6 +20,7 @@ import readline from "readline";
 import child_process from "child_process";
 import { FULLSTACK_AUDIT_VERSION, FULLSTACK_AUDIT_ENGINE, tokenizeCodeIdentifier, expandSynonyms, AtlasIndex } from "./constants.js";
 import { applyUnifiedDiff, batchReplaceTokens } from "./precision-patcher.js";
+import { isInsideRoot } from "../bin/path-contained.js";
 import { runAdaptiveAudit } from "./adaptive-sniffer.js";
 import { catalogReferenceRepos } from "./reference-cataloger.js";
 
@@ -640,7 +641,7 @@ function toolSurgicalPatch(filePath: string, target: string, replacement: string
 
   const resolvedRoot = path.resolve(root);
   const fullPath = path.isAbsolute(filePath) ? path.resolve(filePath) : path.resolve(root, filePath);
-  if (!fullPath.startsWith(resolvedRoot)) {
+  if (!isInsideRoot(resolvedRoot, fullPath)) {
     return { content: `❌ Security Error: Path traversal forbidden. Path outside workspace root: ${filePath}`, isError: true };
   }
   if (!fs.existsSync(fullPath)) {

@@ -69,6 +69,7 @@ curl -fsSL "$BASE_URL/scripts/audit-backend.ts" -o "$TARGET_DIR/scripts/audit-ba
 curl -fsSL "$BASE_URL/scripts/constants.ts" -o "$TARGET_DIR/scripts/constants.ts"
 for f in precision-patcher.ts adaptive-sniffer.ts reference-cataloger.ts; do curl -fsSL "$BASE_URL/scripts/$f" -o "$TARGET_DIR/scripts/$f"; done
 curl -fsSL "$BASE_URL/bin/audit.js" -o "$TARGET_DIR/bin/audit.js"
+curl -fsSL "$BASE_URL/bin/path-contained.js" -o "$TARGET_DIR/bin/path-contained.js"
 
 # Construct rule block (same text as generateDynamicRuleBlock in scripts/audit.ts)
 RULE_BLOCK="$(cat <<'RULE_EOF'

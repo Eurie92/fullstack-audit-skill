@@ -74,6 +74,7 @@ foreach ($f in @("precision-patcher.ts", "adaptive-sniffer.ts", "reference-catal
 $BinDir = Join-Path $TargetDir "bin"
 if (-not (Test-Path $BinDir)) { New-Item -ItemType Directory -Force -Path $BinDir | Out-Null }
 Invoke-WebRequest -Uri "$BaseUrl/bin/audit.js" -OutFile (Join-Path $BinDir "audit.js")
+Invoke-WebRequest -Uri "$BaseUrl/bin/path-contained.js" -OutFile (Join-Path $BinDir "path-contained.js")
 
 # Construct rule block (same text as generateDynamicRuleBlock in scripts/audit.ts)
 $RuleParts = [System.Collections.Generic.List[string]]::new()
