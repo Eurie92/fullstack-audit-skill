@@ -3,7 +3,7 @@
  * 
  * High-performance atomic unified diffing and stream token editing.
  * Features:
- * 1. applyUnifiedDiff: Applies unified hunk diffs atomically without full file rewrites (74x token savings).
+ * 1. applyUnifiedDiff: Applies unified hunk diffs atomically without full file rewrites.
  * 2. batchReplaceTokens: 1-turn mass color, token, and string replacer across the entire codebase.
  * 3. atomicWrite: Writes to .tmp file first, renames on success, 100% rollback on hunk mismatch.
  */

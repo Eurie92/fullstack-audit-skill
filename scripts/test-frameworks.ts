@@ -111,7 +111,7 @@ async function runTestMatrix() {
       import { Sparkles } from "lucide-react";
       export function UserCard() {
         return (
-          <div className="bg-void rounded-2xl border-line">
+          <div className="bg-card rounded-2xl border">
             <span className="text-zinc-500 font-mono">User</span>
             <Sparkles className="w-4 h-4" />
             <button className="bg-red-500">Raw Action</button>
@@ -722,9 +722,9 @@ async function runTestMatrix() {
     assert(fs.existsSync(path.join(batch4AppDir, "skills", "audit", "fullstack-audit", "SKILL.md")), "Hermes Agent SKILL.md generated");
 
     // ============================================================
-    // Test 13: LRU Cache, Causal Graph & Bootstrap Quarantine (v2.14.0)
+    // Test 13: LRU Cache, Causal Graph & Bootstrap Quarantine (LRU cache)
     // ============================================================
-    console.log("\n▶️ Test 13: LRU Cache, Causal Graph & Bootstrap Quarantine (v2.14.0)");
+    console.log("\n▶️ Test 13: LRU Cache, Causal Graph & Bootstrap Quarantine (LRU cache)");
 
     // 1. Verify bootstrap .gitignore quarantine
     const dummyAppDir = path.join(TEST_DIR, "quarantine-app");

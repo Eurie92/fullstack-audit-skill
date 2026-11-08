@@ -90,8 +90,7 @@ npx fullstack-audit --theme --route /portal/reseller --compact
 ```
 
 ### Advantages:
-* **Token Reduction**: Generates only ~15 lines of Markdown instead of a 2,000-line punchlist (**99.8% token savings**).
-* **Speed**: Returns in **< 40ms**.
+* **Token Reduction**: Generates only ~15 lines of Markdown instead of a 2,000-line punchlist.
 * **Direct Scope**: The agent sees only the buttons, modals, and colors used by that exact route.
 
 ---
@@ -128,9 +127,9 @@ Whether running in **Antigravity, Cursor, Claude Code, Windsurf, Codex, or VS Co
 
 ### The Inner-Loop Protocol (Iterative Tweaks — 1 to 2s):
 1. **User input**: A screenshot pasted into chat or a plain-text adjustment request.
-2. **Instant Localization**: The agent reads `06_VISIBLE_TEXT_AND_LABELS_MAP.md` or `07_VISUAL_AND_ICON_INDEX.md` (0ms).
+2. **Instant Localization**: The agent reads `06_VISIBLE_TEXT_AND_LABELS_MAP.md` or `07_VISUAL_AND_ICON_INDEX.md`.
 3. **Surgical Edit**: Direct modification of the target component file (1s).
-4. **Dev Server Fast-Refresh**: Next.js / Vite / Nuxt HMR hot-reloads the developer's browser in 50ms.
+4. **Dev Server Fast-Refresh**: Next.js / Vite / Nuxt HMR hot-reloads the developer's browser.
 5. **No MCP / No Per-Edit Compile**: Headless browser MCPs and full project typechecks are skipped during intermediate steps.
 
 ### The Outer-Loop Protocol (Task Checkpoint):

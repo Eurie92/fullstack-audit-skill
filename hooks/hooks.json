@@ -1,0 +1,17 @@
+{
+  "description": "Blocks unscoped recursive directory walks from Windows shells (Get-ChildItem -Recurse, dir /s) that freeze under Windows Defender.",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash|PowerShell",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/bin/iron-gate-hook.js\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
+}

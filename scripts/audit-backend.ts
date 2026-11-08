@@ -3,7 +3,7 @@ import path from "path";
 import { FULLSTACK_AUDIT_VERSION, FULLSTACK_AUDIT_ENGINE, getAtlasProvenanceHeader, AtlasIndexEntry } from "./constants.js";
 
 /**
- * Universal Backend Atlas & Full-Stack Audit Engine (v2.15.0)
+ * Universal Backend Atlas & Full-Stack Audit Engine
  * 
  * Generates docs/backend-atlas/:
  * 1. 01_API_ROUTES_AND_ENDPOINTS.md (Next.js App/Pages Router API, Express, Hono, Remix)
@@ -1511,7 +1511,7 @@ export function writeBackendAtlas(result: BackendAuditResult, rootDir: string = 
 
   fs.writeFileSync(path.join(outputDir, "README.md"), mdReadme);
 
-  // 8. Generate .backend-index.json for sub-3ms lookup
+  // 8. Generate .backend-index.json for index lookups
   const backendEntries: AtlasIndexEntry[] = [];
   result.endpoints.forEach(e => {
     backendEntries.push({

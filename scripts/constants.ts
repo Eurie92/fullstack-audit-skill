@@ -3,9 +3,9 @@
  * Single source of truth for versioning, engine metadata, and harness definitions.
  */
 
-export const FULLSTACK_AUDIT_VERSION = "2.17.0";
-export const FULLSTACK_AUDIT_ENGINE = "Living Fullstack Atlas & Precision Adaptive Engine v2.17.0";
-export const FULLSTACK_AUDIT_RELEASE_DATE = "2026-11-02";
+export const FULLSTACK_AUDIT_VERSION = "2.17.1";
+export const FULLSTACK_AUDIT_ENGINE = "Living Fullstack Atlas & Precision Adaptive Engine v2.17.1";
+export const FULLSTACK_AUDIT_RELEASE_DATE = "2026-11-08";
 
 export type AuditProfile = "triad" | "standalone" | "custom";
 
@@ -87,7 +87,7 @@ export function tokenizeCodeIdentifier(input: string): string[] {
     .filter(t => t.length > 1);
 }
 
-// Fullstack Concept & Synonym Map (0ms In-Memory Concept Expansion)
+// Fullstack Concept & Synonym Map (in-memory concept expansion)
 export const FULLSTACK_SYNONYMS: Record<string, string[]> = {
   "login": ["signin", "auth", "session", "user"],
   "signin": ["login", "auth", "session"],

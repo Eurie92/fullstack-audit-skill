@@ -13,8 +13,8 @@ import { fileURLToPath } from "url";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-let FULLSTACK_AUDIT_VERSION = "2.15.0";
-let FULLSTACK_AUDIT_ENGINE = "Living Fullstack Atlas & Minimalist Engine v2.15.0";
+let FULLSTACK_AUDIT_VERSION = "2.17.1";
+let FULLSTACK_AUDIT_ENGINE = "Living Fullstack Atlas & Minimalist Engine v2.17.1";
 try {
   const pkgPath = path.resolve(__dirname, "../package.json");
   if (fs.existsSync(pkgPath)) {
@@ -149,7 +149,6 @@ export function ensureGitignoreProtection(projectRoot) {
       "docs/llms.txt",
       "docs/llms-full.txt",
       "docs/THEME_MIGRATION_PUNCHLIST.md",
-      "scripts/benchmark-*.ts",
     ];
 
     const missing = requiredEntries.filter(e => !content.includes(e));
@@ -174,7 +173,6 @@ function resolveProjectRoot(projectRoot) {
   } else if (projectRoot) {
     root = path.resolve(process.cwd(), projectRoot);
   }
-  ensureGitignoreProtection(root);
   return root;
 }
 
@@ -358,7 +356,7 @@ function toolLocateVisual(query, projectRoot) {
       return { content: notFoundMsg, isError: false };
     }
 
-    const lines = [`🎯 [VISUAL LOCATOR: 0ms Match] Found ${hits.length} visual element(s) for "${query}":\n`];
+    const lines = [`🎯 [VISUAL LOCATOR] Found ${hits.length} visual element(s) for "${query}":\n`];
     hits.slice(0, 10).forEach(h => {
       const e = h.entry;
       const metaStr = e.meta ? ` [${e.meta}]` : "";
@@ -445,7 +443,7 @@ function toolCausalPath(from, to, projectRoot) {
   let nodes = [];
   let links = [];
 
-  // 1. Fast-Path A: Pre-computed causalGraph from .atlas-index.json (0ms in-memory graph)
+  // 1. Fast-Path A: Pre-computed causalGraph from .atlas-index.json (in-memory graph)
   const indexPath = path.join(root, "docs", "frontend-atlas", ".atlas-index.json");
   if (fs.existsSync(indexPath)) {
     try {
@@ -546,7 +544,7 @@ function toolCausalPath(from, to, projectRoot) {
     return `   ${idx + 1}. [${typeLabel}] ${nodeId}`;
   });
 
-  const outputResult = `⚡ [CAUSAL PATH: Sub-5ms Trace]\n${foundPath.join(" ➔ ")}\n\nSteps:\n${steps.join("\n")}`;
+  const outputResult = `⚡ [CAUSAL PATH]\n${foundPath.join(" ➔ ")}\n\nSteps:\n${steps.join("\n")}`;
   pathLruCache.set(cacheKey, outputResult);
   return {
     content: outputResult,
@@ -569,7 +567,7 @@ function toolSymbolSlices(symbolName, projectRoot) {
       (e.symbol.toLowerCase().includes(q) || (e.meta && e.meta.toLowerCase().includes(q)))
     );
     if (preHits.length > 0) {
-      const out = [`⚡ [GOD-FILE SLICER: Sub-1ms Index Hit] Found ${preHits.length} slice(s) matching "${symbolName}":\n`];
+      const out = [`⚡ [GOD-FILE SLICER] Found ${preHits.length} slice(s) matching "${symbolName}":\n`];
       preHits.forEach(h => {
         out.push(`   - ${h.file}:${h.line} [${h.meta || h.category}] -> ${h.symbol}`);
       });
@@ -735,6 +733,7 @@ function toolAudit(projectRoot, frontendOnly, backendOnly) {
   visualLruCache.clear();
   pathLruCache.clear();
   const root = resolveProjectRoot(projectRoot);
+  ensureGitignoreProtection(root); // only when the user asks to write the atlas
   try {
     const auditScript = path.resolve(__dirname, "audit.js");
     const flags = [];
@@ -765,7 +764,7 @@ function toolAudit(projectRoot, frontendOnly, backendOnly) {
 const TOOL_DEFINITIONS = [
   {
     name: "fullstack_find",
-    description: "Sub-3ms token-compact lookup for routes, components, symbols, labels, queries, APIs, and models across the Fullstack Atlas.",
+    description: "Look up routes, components, symbols, visible UI labels, React Query keys, API routes and DB models in the pre-built atlas. Returns short file:line hits. Use it first for 'where is X' questions in a web app. The atlas is a snapshot: confirm a hit by reading the file, and use normal text search (Grep/rg) when it returns nothing.",
     inputSchema: {
       type: "object",
       properties: {
@@ -778,7 +777,7 @@ const TOOL_DEFINITIONS = [
   },
   {
     name: "fullstack_locate_visual",
-    description: "0ms visual locator for live pulse dots (animate-pulse), capsule pills (rounded-full), status badges, and action icons.",
+    description: "Find UI elements by how they look rather than by name: live pulse dots (animate-pulse), capsule pills (rounded-full), status badges and action icons. Use it when the user describes an element visually (e.g. 'the green dot in the navbar').",
     inputSchema: {
       type: "object",
       properties: {
@@ -790,7 +789,7 @@ const TOOL_DEFINITIONS = [
   },
   {
     name: "fullstack_resolve",
-    description: "Fuzzy case-insensitive component and file path resolver (prefix-agnostic). Resolves exact file paths without directory scanning.",
+    description: "Resolve a loosely written component or file name (any casing, kebab or Pascal case, no folder prefix) to real file paths from the atlas file list. Use it when you know roughly what a file is called but not where it lives.",
     inputSchema: {
       type: "object",
       properties: {
@@ -802,7 +801,7 @@ const TOOL_DEFINITIONS = [
   },
   {
     name: "fullstack_path",
-    description: "Sub-5ms causal execution path finder tracing UI triggers to backend API endpoints and DB models.",
+    description: "Trace how a UI element connects to the backend: component -> server action or API route -> DB model. Use it for 'what happens when I click X' or 'what calls this model' questions that span several files.",
     inputSchema: {
       type: "object",
       properties: {
@@ -841,7 +840,7 @@ const TOOL_DEFINITIONS = [
   },
   {
     name: "fullstack_audit",
-    description: "Generates or refreshes the fullstack atlas catalog (frontend & backend) into docs/frontend-atlas/ and docs/backend-atlas/.",
+    description: "Rebuild the atlas from the current code into docs/frontend-atlas/ and docs/backend-atlas/ and add those folders to an existing .gitignore. Writes files. Use it after adding routes, pages or models, or when lookups look stale.",
     inputSchema: {
       type: "object",
       properties: {
@@ -855,7 +854,6 @@ const TOOL_DEFINITIONS = [
 
 export function startMcpServer() {
   logDebug(`Initializing Fullstack Audit MCP Server daemon v${FULLSTACK_AUDIT_VERSION}...`);
-  ensureGitignoreProtection(process.cwd());
 
   let clientUsesHeaders = false;
 

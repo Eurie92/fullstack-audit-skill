@@ -4,6 +4,7 @@ import path from "path";
 import os from "os";
 import child_process from "child_process";
 import ts from "typescript";
+import { fileURLToPath } from "url";
 import { runUniversalBackendAudit } from "./audit-backend.js";
 import { applyUnifiedDiff, batchReplaceTokens } from "./precision-patcher.js";
 import { runAdaptiveAudit } from "./adaptive-sniffer.js";
@@ -23,7 +24,7 @@ import {
 } from "./constants.js";
 
 /**
- * Universal Fullstack Atlas & Design System Audit Engine (v2.15.0)
+ * Universal Fullstack Atlas & Design System Audit Engine
  * 
  * Features:
  * 1. Multi-Framework Auto-Discovery (Next.js App/Pages Router, Vite + React SPAs, Tailwind)
@@ -664,7 +665,6 @@ function determineZone(relPath: string, structure: ProjectStructure): string {
       if (second) return `${second.charAt(0).toUpperCase() + second.slice(1)} Portal`;
       return "Portal";
     }
-    if (first === "supplier") return "Supplier Portal";
     if (first === "auth" || first.includes("login") || first.includes("signup")) return "Auth & Onboarding";
     if (first === "api") return "API Routes";
     if (first === "routes") {
@@ -687,8 +687,7 @@ function determineZone(relPath: string, structure: ProjectStructure): string {
 
     if (first === "public" || first === "storefront") return "Storefront (Public)";
     if (first === "admin") return "Admin Panel";
-    if (first === "portal" || first === "reseller") return "Reseller Portal";
-    if (first === "supplier") return "Supplier Portal";
+    if (first === "portal") return "Portal";
     if (first === "auth") return "Auth & Onboarding";
     if (first === "navigation" || first === "payment" || first === "providers") return "Shared Layout & Providers";
 
@@ -719,7 +718,7 @@ function getFiles(dir: string, fileList: string[] = []): string[] {
         !item.startsWith(".turbo") &&
         !item.startsWith(".agent") &&
         ![
-          "node_modules", "dist", "build", ".checkpoint-stage2",
+          "node_modules", "dist", "build", "cloned-repos",
           ".svelte-kit", ".nuxt", ".astro", ".react-router", ".cache", ".output"
         ].includes(item)
       ) {
@@ -756,9 +755,9 @@ function getFiles(dir: string, fileList: string[] = []): string[] {
   return fileList;
 }
 
-const APPROVED_HEXES = new Set([
-  "#ffffff", "#000000", "#f3ede3", "#07080b", "#0b0c10", "#10b981", "#38bdf8", "#f59e0b", "#cbd5e1"
-]);
+// Pure black/white are never drift. Brand colors belong in CSS variables / theme config, which are skipped below.
+const APPROVED_HEXES = new Set(["#fff", "#ffffff", "#000", "#000000"]);
+const CSS_VAR_DEFINITION = /^\s*--[\w-]+\s*:/;
 
 const TAILWIND_COLOR_FAMILIES = [
   "slate", "gray", "zinc", "neutral", "stone",
@@ -782,7 +781,7 @@ const DISCLOSED_ELEMENT_REGEX = /<(?:Dialog|Modal|Drawer|Sheet|Popover|AlertDial
 
 const ROGUE_COLOR_REGEX = /\b(bg|text|border|ring)-(zinc|neutral|gray|stone)-[1-9]00\b/g;
 const HEX_REGEX = /#(?:[0-9a-fA-F]{3,4}){1,2}\b/g;
-const CARD_SURFACE_REGEX = /(?:class(?:Name)?|:class|class:list|v-bind:class)=["'`]([^"'`]*(?:bg-(?:void|slab|surface|card|white|black)|rounded-(?:xl|2xl|3xl)|border-line|backdrop-blur)[^"'`]*)["'`]/g;
+const CARD_SURFACE_REGEX = /(?:class(?:Name)?|:class|class:list|v-bind:class)=["'`]([^"'`]*(?:bg-(?:surface|card|white|black|background|muted|popover)|rounded-(?:xl|2xl|3xl)|backdrop-blur)[^"'`]*)["'`]/g;
 const MODAL_REGEX = /<(?:Dialog|Modal|Drawer|DrawerContent|DialogContent)\b|<div[^>]*role=["']dialog["']/g;
 const TYPOGRAPHY_REGEX = /\b(font-mono|font-sans|font-geist|font-jetbrains|text-(?:xs|sm|base|lg|xl|2xl|3xl|4xl|5xl))\b/g;
 
@@ -835,7 +834,7 @@ function auditGlobalStylesheets(rootDir: string): GlobalStylesheetAudit[] {
       HEX_REGEX.lastIndex = 0;
       while ((hMatch = HEX_REGEX.exec(line)) !== null) {
         const hex = hMatch[0].toLowerCase();
-        if (!APPROVED_HEXES.has(hex) && !trimmed.startsWith("/*") && !trimmed.startsWith("//")) {
+        if (!APPROVED_HEXES.has(hex) && !CSS_VAR_DEFINITION.test(trimmed) && !trimmed.startsWith("/*") && !trimmed.startsWith("//")) {
           hardcodedHexes.push({ line: lineNum, hex, snippet: trimmed.slice(0, 80) });
         }
       }
@@ -864,8 +863,8 @@ function executeMultiAgentPartition(audits: ComponentAudit[], routeMaps: RouteMa
   console.log("┌────────────────────────────────────────────────────────────────────────┐");
   console.log("│             PARALLEL SUBAGENT PARTITION BRIEFS (Map-Reduce)            │");
   console.log("├────────────────────────────────────────────────────────────────────────┤");
-  console.log(`│ Subagent 1 (Public Storefront):  ${zoneA.length.toString().padEnd(4)} files -> Home, Terms, Track, Login, Signup │`);
-  console.log(`│ Subagent 2 (Modals & Overlays):  ${zoneB.length.toString().padEnd(4)} files -> Checkout, Connect, Vault Drawer   │`);
+  console.log(`│ Subagent 1 (Public Storefront):  ${zoneA.length.toString().padEnd(4)} files -> public pages & auth          │`);
+  console.log(`│ Subagent 2 (Modals & Overlays):  ${zoneB.length.toString().padEnd(4)} files -> modals, drawers, sheets         │`);
   console.log(`│ Subagent 3 (UI Primitives & CSS):${zoneC.length.toString().padEnd(4)} files -> globals.css, tabs.tsx, buttons    │`);
   console.log(`│ Subagent 4 (Portals & Admin):    ${zoneD.length.toString().padEnd(4)} files -> /portal, /admin                    │`);
   console.log("└────────────────────────────────────────────────────────────────────────┘\n");
@@ -875,7 +874,7 @@ function executeMultiAgentPartition(audits: ComponentAudit[], routeMaps: RouteMa
   console.log(`Subagent 1 (Storefront): "Audit and normalize ${zoneA.length} files in Zone A. Run --verify to close."`);
   console.log(`Subagent 2 (Modals):     "Audit and normalize ${zoneB.length} overlays in Zone B. Ensure dark/light adaptive surfaces."`);
   console.log(`Subagent 3 (Primitives): "Check globals.css for radial gradients and align shared UI tabs.tsx / buttons."`);
-  console.log(`Subagent 4 (Portals):    "Audit ${zoneD.length} portal & admin routes for standard obsidian/ceramic tokens."`);
+  console.log(`Subagent 4 (Portals):    "Audit ${zoneD.length} portal & admin routes for consistent design-token usage."`);
   console.log("--------------------------------------------------------------------------\n");
   console.log("⚡ All 4 subagents can run concurrently in parallel threads (avg completion: 30s).\n");
 }
@@ -1375,7 +1374,7 @@ function auditFile(filePath: string, structure: ProjectStructure): ComponentAudi
     HEX_REGEX.lastIndex = 0;
     while ((hexMatch = HEX_REGEX.exec(line)) !== null) {
       const hex = hexMatch[0].toLowerCase();
-      if (!APPROVED_HEXES.has(hex) && !trimmed.startsWith("//") && !trimmed.startsWith("/*")) {
+      if (!APPROVED_HEXES.has(hex) && !CSS_VAR_DEFINITION.test(trimmed) && !trimmed.startsWith("//") && !trimmed.startsWith("/*")) {
         hardcodedHexes.push({ line: lineNum, hex, snippet: trimmed.slice(0, 80) });
       }
     }
@@ -2595,92 +2594,27 @@ function syncAgentRulesInPlace() {
 
 // Automated Self-Updater (--update)
 async function executeSelfUpdate() {
-  console.log("📥 Checking for fullstack-audit-skill updates from GitHub (Eurie92/fullstack-audit-skill)...");
+  // Code updates go through the package manager only: no raw-file downloads over the installed engine.
+  console.log(`📦 Installed: v${FULLSTACK_AUDIT_VERSION}`);
   try {
     const pkgRes = await fetch("https://raw.githubusercontent.com/Eurie92/fullstack-audit-skill/main/package.json");
-    if (!pkgRes.ok) {
-      console.error(`❌ HTTP ${pkgRes.status} fetching remote package.json. Please check your internet connection.`);
-      return;
+    if (pkgRes.ok) {
+      const remotePkg = (await pkgRes.json()) as { version: string };
+      console.log(`🌐 Latest on GitHub: v${remotePkg.version}`);
+      if (remotePkg.version !== FULLSTACK_AUDIT_VERSION) {
+        console.log("⬆️  To upgrade the engine, use your package manager or plugin manager:");
+        console.log("   npm i -g github:Eurie92/fullstack-audit-skill   (CLI)");
+        console.log("   Claude Code plugin: update it from the /plugin menu");
+      }
     }
-    const remotePkg = (await pkgRes.json()) as { version: string };
-
-    let currentVersion = "2.0.0";
-    if (fs.existsSync("package.json")) {
-      try {
-        const localPkg = JSON.parse(fs.readFileSync("package.json", "utf8"));
-        if ((localPkg.name === "fullstack-audit-skill" || localPkg.name === "frontend-audit-skill") && localPkg.version) {
-          currentVersion = localPkg.version;
-        }
-      } catch {}
-    }
-
-    console.log(`📦 Installed: v${currentVersion} | Latest Remote: v${remotePkg.version}`);
-
-    // In local development repo: don't overwrite local uncommitted source unless remote is strictly newer
-    const isDevelopmentRepo = fs.existsSync(".git") && fs.existsSync("package.json") && !fs.existsSync(".agent/skills/fullstack-audit");
-    if (isDevelopmentRepo && remotePkg.version === currentVersion) {
-      console.log("💡 Currently in active development repository. Synchronizing rules and atlas without overwriting local source.");
-      syncAgentRulesInPlace();
-      runUniversalFrontendAudit();
-      await runUniversalBackendAudit();
-      console.log("🎉 Local development environment is 100% up to date!");
-      return;
-    }
-
-    console.log("📥 Downloading latest SKILL.md, scripts/audit.ts, scripts/audit-backend.ts, scripts/constants.ts, and bin/audit.js...");
-    const skillRes = await fetch("https://raw.githubusercontent.com/Eurie92/fullstack-audit-skill/main/SKILL.md");
-    const skillContent = await skillRes.text();
-
-    const auditRes = await fetch("https://raw.githubusercontent.com/Eurie92/fullstack-audit-skill/main/scripts/audit.ts");
-    const auditContent = await auditRes.text();
-
-    const backendRes = await fetch("https://raw.githubusercontent.com/Eurie92/fullstack-audit-skill/main/scripts/audit-backend.ts");
-    const backendContent = await backendRes.text();
-
-    const constantsRes = await fetch("https://raw.githubusercontent.com/Eurie92/fullstack-audit-skill/main/scripts/constants.ts");
-    const constantsContent = await constantsRes.text();
-
-    const binRes = await fetch("https://raw.githubusercontent.com/Eurie92/fullstack-audit-skill/main/bin/audit.js");
-    const binContent = await binRes.text();
-
-    // Target locations: primary is fullstack-audit, legacy mirror is frontend-audit
-    const primaryDir = fs.existsSync(".agent/skills") ? ".agent/skills/fullstack-audit" : "";
-    const legacyDir = fs.existsSync(".agent/skills/frontend-audit") ? ".agent/skills/frontend-audit" : "";
-
-    const writeTarget = (baseDir: string) => {
-      if (!baseDir) return;
-      fs.mkdirSync(path.join(baseDir, "scripts"), { recursive: true });
-      fs.mkdirSync(path.join(baseDir, "bin"), { recursive: true });
-      fs.writeFileSync(path.join(baseDir, "SKILL.md"), skillContent, "utf8");
-      fs.writeFileSync(path.join(baseDir, "scripts", "audit.ts"), auditContent, "utf8");
-      fs.writeFileSync(path.join(baseDir, "scripts", "audit-backend.ts"), backendContent, "utf8");
-      fs.writeFileSync(path.join(baseDir, "scripts", "constants.ts"), constantsContent, "utf8");
-      fs.writeFileSync(path.join(baseDir, "bin", "audit.js"), binContent, "utf8");
-    };
-
-    if (primaryDir) writeTarget(primaryDir);
-    if (legacyDir) writeTarget(legacyDir);
-    if (!primaryDir && !legacyDir) {
-      fs.writeFileSync("SKILL.md", skillContent, "utf8");
-      fs.writeFileSync("scripts/audit.ts", auditContent, "utf8");
-      fs.writeFileSync("scripts/audit-backend.ts", backendContent, "utf8");
-      fs.writeFileSync("scripts/constants.ts", constantsContent, "utf8");
-      fs.writeFileSync("bin/audit.js", binContent, "utf8");
-    }
-
-    console.log(`✅ Successfully updated fullstack-audit-skill engine`);
-
-    // Update agent rules in-place
-    syncAgentRulesInPlace();
-
-    console.log("\n🔄 Refreshing Fullstack Atlas with newly updated skill engine...");
-    runUniversalFrontendAudit();
-    await runUniversalBackendAudit();
-
-    console.log(`\n🎉 fullstack-audit-skill successfully synchronized to v${remotePkg.version}!`);
   } catch (err: any) {
-    console.error(`❌ Update failed: ${err.message}`);
+    console.warn(`⚠️ Could not check the latest version: ${err.message}`);
   }
+
+  syncAgentRulesInPlace();
+  console.log("\n🔄 Refreshing Fullstack Atlas...");
+  runUniversalFrontendAudit();
+  await runUniversalBackendAudit();
 }
 
 // 10. Zero-Search Agent Handoff Manifest Generator (--manifest <target>)
@@ -2833,7 +2767,7 @@ function executeThemeCodemod(audits: ComponentAudit[], structure?: ProjectStruct
 
   if (!FROM_HEXES || !TO_TOKEN) {
     console.error("❌ Error: --migrate-theme requires both --from <hexes> and --to <target_token>.");
-    console.error('   Example: npx fullstack-audit --migrate-theme --from "#121110,#1E1C1A" --to "dark:bg-[#14161D]"');
+    console.error('   Example: npx fullstack-audit --migrate-theme --from "#hex1,#hex2" --to "dark:bg-slate-900"');
     process.exit(1);
   }
 
@@ -3027,7 +2961,9 @@ function executeVerificationGate(
 
   if (GATE_CLEAN_MODE) {
     console.log("🔒 Strict Zero-Drift Gate Activated (--gate-clean):");
-    let scopedAudits = audits;
+    // Fixture colors in test files are not UI drift.
+    const isTestFile = (p: string) => /(^|\/)(tests?|__tests__)\//.test(p.replace(/\\/g, "/")) || /(^|\/)test-[^/]*$/.test(p.replace(/\\/g, "/")) || /\.(test|spec)\.[cm]?[jt]sx?$/.test(p);
+    let scopedAudits = audits.filter(a => !isTestFile(a.relativePath));
     if (ROUTE_QUERY) {
       const rq = ROUTE_QUERY.toLowerCase();
       scopedAudits = audits.filter(a => a.relativePath.toLowerCase().includes(rq));
@@ -3769,7 +3705,7 @@ function executeFastAtlasFind(query: string, compact: boolean): boolean {
         console.log(`... (+${hits.length - 10} more matches in ${path.relative(ROOT_DIR, OUTPUT_DIR)})`);
       }
     } else {
-      console.log(`⚡ [Atlas Fast-Path: Sub-3ms Index Match] Found ${hits.length} result(s) for "${query}":\n`);
+      console.log(`⚡ [Atlas Index Match] Found ${hits.length} result(s) for "${query}":\n`);
       hits.slice(0, 10).forEach(h => {
         const e = h.entry;
         const metaStr = e.meta ? ` (${e.meta})` : "";
@@ -3968,7 +3904,7 @@ function buildAndSaveAtlasIndex(
     } catch {}
   }
 
-  // Collect all unique indexed project files for 0ms in-memory resolver
+  // Collect all unique indexed project files for the in-memory resolver
   const fileSet = new Set<string>();
   audits.forEach(a => { if (a.relativePath) fileSet.add(a.relativePath); });
   routeMaps.forEach(r => { if (r.pageFile) fileSet.add(r.pageFile); });
@@ -4188,161 +4124,55 @@ export function resolveProfileOptions(): ProfileOptions {
 }
 
 export function generateDynamicRuleBlock(profileOpts: ProfileOptions = resolveProfileOptions()): string {
-  const { profile, ponytail, caveman, superpowers } = profileOpts;
-  const isTriad = profile === "triad" && ponytail && caveman && superpowers;
-  const isStandalone = profile === "standalone" || (!ponytail && !caveman && !superpowers);
-
+  const { ponytail, caveman, superpowers } = profileOpts;
   const lines: string[] = [];
   lines.push("<!-- START_FULLSTACK_AUDIT_RULE -->");
   lines.push("<!-- START_FRONTEND_AUDIT_RULE -->");
-
-  if (isTriad) {
-    lines.push("## Fullstack 4-Phase Synergy Engine (0ms Atlas • Ponytail KISS • Caveman Terse • Dual-Speed Verify)");
-    lines.push("Universal execution rule across all harnesses (Antigravity, Cursor, Claude Code, Windsurf, Codex, OpenCode, VS Code).");
-    lines.push("");
-    lines.push("### The 4-Phase Operational Pipeline");
-    lines.push("");
-    lines.push("#### Phase 1: GPS / Locate (fullstack-audit)");
-  } else if (isStandalone) {
-    lines.push("## Fullstack Atlas Engine (0ms Zero-Grep • Dual-Speed Verify)");
-    lines.push("Universal execution rule across all harnesses (Antigravity, Cursor, Claude Code, Windsurf, Codex, OpenCode, VS Code).");
-    lines.push("");
-    lines.push("### The Operational Protocol");
-    lines.push("");
-    lines.push("#### 1. GPS / Locate (fullstack-audit)");
-  } else {
-    const activePillars: string[] = ["0ms Atlas"];
-    if (ponytail) activePillars.push("Ponytail KISS");
-    if (caveman) activePillars.push("Caveman Terse");
-    if (superpowers) activePillars.push("Dual-Speed Verify");
-    lines.push(`## Fullstack Modular Synergy Engine (${activePillars.join(" • ")})`);
-    lines.push("Universal execution rule across all harnesses (Antigravity, Cursor, Claude Code, Windsurf, Codex, OpenCode, VS Code).");
-    lines.push("");
-    lines.push("### The Operational Pipeline");
-    lines.push("");
-    lines.push("#### Phase 1: GPS / Locate (fullstack-audit)");
-  }
-
-  // Phase 1 / GPS Content
-  lines.push("- **IRON GATE INVARIANT (Zero-Grep & Zero-Scratch Absolute Mandate across ALL Tasks)**:");
-  lines.push("  - **FORBIDDEN (All Recursive Searches)**: NEVER run `Get-ChildItem -Recurse` (under ANY parameters or subdirectories: 'app', 'components', 'src', -Filter, -Include, -Path), `Select-String`, `grep -r`, `rg`, `find`, or `dir /s`. Scoped subfolder recursive scans are EQUALLY BANNED. The Iron Gate Lifecycle Hook physically denies these calls.");
-  lines.push("  - **FORBIDDEN (Refactoring & Import Grep)**: NEVER use recursive grep to find imports, functions, or dependencies during refactoring. Use `docs/backend-atlas/06_FULLSTACK_CROSS_REFERENCE_MAP.md` or `fullstack_path` (sub-5ms causal tracer).");
-  lines.push("  - **FORBIDDEN (Inline Scratch Scripts)**: NEVER execute `node -e \"const fs = require('fs')...\"`, `python -c \"...\"`, or PowerShell `[IO.File]::ReadAllText` / `ForEach-Object` one-liners to locate, read, or patch files.");
-  lines.push("  - **FORBIDDEN (Path Guessing)**: NEVER guess paths or prepend arbitrary prefixes like `src/components/`.");
-  lines.push("  - **MANDATORY GPS FIRST-ACTION**: The FIRST action MUST locate the element deterministically:");
-  lines.push("    - **Native MCP Fast Find**: Call `fullstack_find(query: \"<query>\")` (sub-3ms token-compact lookup) or `node bin/audit.js --find \"<query>\" --compact`.");
-  lines.push("    - **Native MCP Visual & Icon Locator**: Call `fullstack_locate_visual(query: \"<query>\")` (0ms lookup for live pulse dots `animate-pulse`, capsule pills `rounded-full`, badges, action icons).");
-  lines.push("    - **Native MCP Fuzzy Case Resolver**: Call `fullstack_resolve(name: \"<name>\")` (prefix-agnostic casing & path resolver in 0ms).");
-  lines.push("    - **Native MCP Causal Path Tracer**: Call `fullstack_path(from: \"<fromComponent>\", to: \"<toActionOrModel>\")` (sub-5ms causal dependency path).");
-  lines.push("    - **Native MCP God-File Slicer**: Call `fullstack_symbol(symbol: \"<method>\")` (exact start/end lines before calling `read_file`).");
-  lines.push("    - **Native MCP Surgical Patcher**: Call `fullstack_patch(filePath: \"<file>\", target: \"<old>\", replacement: \"<new>\")` or `edit_file`.");
-  lines.push("    - **Pre-Computed Atlases**: Direct `read_file` on `docs/frontend-atlas/` (01 routes, 02 components, 03 tokens, 06 visible text, 07 icons) or `docs/backend-atlas/` (01 APIs, 02 DB models, 03 server actions, 04 auth).");
-  lines.push("- **Screenshot & Temp Image Armor**: When a user references a screenshot in `AppData\\Local\\Temp\\orca-paste-*.png`:");
-  lines.push("  - **FORBIDDEN**: Never call `read_file` or `view_file` directly on `AppData\\Local\\Temp` paths (avoids OS hook sandbox interception).");
-  lines.push("  - **Fast-Path A (Visual Atlas)**: Query `fullstack_locate_visual(query: \"<element>\")` or view `docs/frontend-atlas/02_COMPONENT_INVENTORY.md` in 0ms without opening the image.");
-  lines.push("  - **Fast-Path B (Scratch Copy)**: If the raw screenshot must be viewed, copy first: `Copy-Item '<temp-path>' 'scratch\\screenshot.png'`, then open `scratch\screenshot.png`.");
-  lines.push("- **PowerShell Quoting & Surgical Patching**:");
-  lines.push("  - Wrap PowerShell arguments in single-quotes `'...'` (prevents `&` reserved character syntax crash and variable expansion).");
-  lines.push("  - To edit code: Prefer native MCP `fullstack_patch` or harness `edit_file` (CRLF-agnostic surgical patcher).");
-  lines.push("- **Immediate Relinquishment Invariant (Zero Over-Investigation Mandate)**:");
-  lines.push("  - Once the target `file:line` is located (via `fullstack_find`, `fullstack_locate_visual`, or `06_VISIBLE_TEXT_AND_LABELS_MAP.md`), the agent MUST IMMEDIATELY output the target `file:line` receipt and STOP.");
-  lines.push("  - **FORBIDDEN**: NEVER continue reading parent wrappers, layouts, or route trees (`page.tsx`, `layout.tsx`) unless the user explicitly requested mount-point tracing.");
-  lines.push("  - For screenshot queries: Extract the visible text label or action icon in 1 read, query `fullstack_find(\"<label>\")`, return the exact `file:line`, and conclude.");
+  lines.push("## Fullstack Atlas (fullstack-audit)");
+  lines.push("This project has a pre-built code atlas in `docs/frontend-atlas/` and `docs/backend-atlas/`, served by the `fullstack-audit` MCP tools. Use it alongside normal search, not instead of it.");
   lines.push("");
-
-  let currentPhase = 2;
-
-  // Phase 2: Ponytail / Native KISS
-  if (ponytail) {
-    lines.push(`#### Phase ${currentPhase}: Design & Anti-Overengineering Firewall (\`ponytail\`)`);
-    lines.push("- **YAGNI Invariant**: The best code is the code never written. Solve the whole problem with the least new code.");
-    lines.push("- **The Ponytail Hierarchy**:");
-    lines.push("  1. *Does it need to exist?* Skip unasked features, options, and speculative abstractions. A vague request gets the smallest working version.");
-    lines.push("  2. *Already in codebase?* Reuse existing helpers, components, and patterns.");
-    lines.push("  3. *Platform feature?* Use standard web/DOM/Tailwind primitives over custom JavaScript trigonometry, 36-point polygon waves, or complex SVG math.");
-    lines.push("  4. *Installed dependency?* Never install a new package for a few lines of logic.");
-    lines.push("  5. *Can it be one line?* Make it one line a reader grasps at a glance.");
-    lines.push("  6. *Shortest working diff wins.* Deletion beats addition. Keep surrounding layers and conventions intact.");
-    lines.push("- **Preserve Always**: Trust boundary validation, auth guards, data-loss error handling, accessibility.");
-    lines.push("- **Shortcuts**: Document deliberate limits as `// shortcut: <limit>, <when to upgrade>`.");
-    lines.push("");
-    currentPhase++;
-  } else if (isStandalone) {
-    lines.push(`#### ${currentPhase}. Implementation & Minimalist Discipline`);
-    lines.push("- Solve the user request with the least code necessary. Reuse existing project helpers and primitives before adding new abstractions or dependencies.");
-    lines.push("- Surgical edits: keep modifications contained to the exact target files located via the atlas. Do not refactor untouched files.");
-    lines.push("");
-    currentPhase++;
-  }
-
-  // Phase 3: Caveman / Natural
-  if (caveman) {
-    lines.push(`#### Phase ${currentPhase}: Communication & Zero-Fluff Receipts (\`caveman\`)`);
-    lines.push("- **Answer First**: Dense result first, technical facts exact.");
-    lines.push("- **Kill Ceremony**: No conversational filler (\"Sure, I can help with that!\", \"I apologize for the confusion\"), no preamble, no postamble.");
-    lines.push("- **Tool Status**: Zero conversational commentary between routine tool calls.");
-    lines.push("- **Compact Diff Receipt**: Conclude replies with a tight diff receipt:");
-    lines.push("  - `Target`: `<file:line>`");
-    lines.push("  - `Diff`: `<old>` ➔ `<new>`");
-    lines.push("  - `Status`: `<HMR applied | Test pass count | Exit code>`");
-    lines.push("");
-    currentPhase++;
-  }
-
-  // Phase 4: Verification / Superpowers or Native Dual-Speed
+  lines.push("### Finding code");
+  lines.push("1. For structural questions, try the MCP tools first:");
+  lines.push("   - `fullstack_find`: routes, components, visible labels, query keys, API routes, DB models");
+  lines.push("   - `fullstack_locate_visual`: elements described by look (pulse dots, capsule pills, badges, icons)");
+  lines.push("   - `fullstack_path`: UI element -> server action / API route -> DB model");
+  lines.push("   - `fullstack_resolve`: loosely written file or component names; `fullstack_symbol`: line ranges inside large files");
+  lines.push("2. Confirm a hit by reading the file at that line. The atlas is a snapshot, so line numbers drift after edits.");
+  lines.push("3. If the atlas has no hit or the code changed since the last audit, use normal search: your Grep/Glob tools, `rg <pattern> <dir>`, or `git grep`.");
+  lines.push("4. On Windows, do not run `Get-ChildItem -Recurse` or `dir /s` on the project root: it walks `node_modules/` and `.next/` and can freeze for many seconds. Scope it to a folder (`Get-ChildItem src -Recurse`) or use `rg`.");
+  lines.push("5. Prefer the MCP tools over the `npx fullstack-audit` CLI; each CLI call starts the engine from scratch and takes seconds.");
+  lines.push("6. Screenshots: look up visible text or icon names with `fullstack_find` / `fullstack_locate_visual`. If a screenshot under `AppData\\Local\\Temp` cannot be opened, copy it into the project's `scratch/` folder first.");
+  lines.push("");
+  lines.push("### Keeping the atlas fresh");
+  lines.push("- Run the `fullstack_audit` tool (or `/fullstack-audit`) after adding routes, pages, components or DB models, or when lookups look stale.");
+  lines.push("");
+  lines.push("### Editing and verifying");
+  lines.push("- Edit with your normal edit tool. `fullstack_patch` is available when shell quoting gets in the way (for example PowerShell and `&`).");
+  lines.push("- Verify in proportion to the change: a style or copy tweak can rely on the dev server's hot reload; changes to types, exports, logic, backend, DB or auth need the typecheck and tests (`npm run typecheck`, `npm test`) before you call them done.");
   if (superpowers) {
-    lines.push(`#### Phase ${currentPhase}: Right-Sized Verification (\`superpowers\` Dual-Speed Harmonization)`);
-    lines.push("- **Inner-Loop (Fast Mode — 1 to 2s responses — Mandatory for UI/CSS/Layout/Copy edits <= 2 files, < 30 lines)**:");
-    lines.push("  - Perform direct surgical file edits (`npx fullstack-audit --patch` or `edit_file`). Let local dev server (Next.js/Vite/Nuxt HMR) refresh in 50ms.");
-    lines.push("  - **HARD FORBIDDEN**: Do NOT run full TypeScript compilation (`tsc --noEmit`, `npm run typecheck`).");
-    lines.push("  - **HARD FORBIDDEN**: Do NOT run `npm run audit` or `npx fullstack-audit` on micro-edits.");
-    lines.push("  - **HARD FORBIDDEN**: Do NOT invoke Superpowers process skills (`brainstorming`, `writing-plans`, `test-driven-development`).");
-    lines.push("  - **HARD FORBIDDEN**: Do NOT invoke multiple design skills in parallel.");
-    lines.push("  - **HARD FORBIDDEN**: Do NOT invoke heavy browser automation (Chrome DevTools MCP / Puppeteer) or curl localhost.");
-    lines.push("  - **Response Time**: Return immediately to the user in 1–2 seconds.");
-    lines.push("- **Outer-Loop (Checkpoint Verification Gate — Milestones/Backend/DB/Auth)**:");
-    lines.push("  - Superpowers Iron Law applies: *No completion claims without fresh verification evidence.*");
-    lines.push("  - Run `npx fullstack-audit --verify --gate-clean` or test suites (`npm test`, `npm run typecheck`).");
-    lines.push("  - Claim completion ONLY with fresh exit code 0 evidence.");
-    lines.push("  - **Zero Polling Invariant**: Do NOT loop on `manage_task status`. The harness features Reactive Wakeup and automatically resumes execution when tasks complete.");
-    lines.push("  - Run `npm run audit` upon milestone completion to synchronize atlases.");
-  } else {
-    const phaseLabel = isStandalone ? `${currentPhase}. Dual-Speed Verification Loop` : `Phase ${currentPhase}: Dual-Speed Verification Loop`;
-    lines.push(`#### ${phaseLabel}`);
-    lines.push("- **Inner-Loop (Fast Mode — 1 to 2s responses for edits <= 2 files, < 30 lines)**:");
-    lines.push("  - Perform direct surgical file edits (`npx fullstack-audit --patch` or `edit_file`). Let local dev server (Next.js/Vite/Nuxt HMR) refresh in 50ms.");
-    lines.push("  - Do NOT run full TypeScript compilation (`tsc --noEmit`) or heavy browser MCPs on micro-edits.");
-    lines.push("- **Outer-Loop (Checkpoint Verification Gate — Milestones/Backend/DB/Auth)**:");
-    lines.push("  - Run verification gates (`npm test`, `npm run typecheck`, or `npx fullstack-audit --verify --gate-clean`) before milestone commits.");
-    lines.push("  - **Zero Polling Invariant**: Do NOT loop on `manage_task status`. The harness features Reactive Wakeup and automatically resumes execution when tasks complete.");
-    lines.push("  - Run `npm run audit` upon milestone completion to synchronize atlases.");
+    lines.push("- Do not claim a task is complete without fresh evidence (command output, exit code 0).");
+  }
+  if (ponytail) {
+    lines.push("");
+    lines.push("### Keep changes small (ponytail)");
+    lines.push("- Solve the whole request with the least new code: reuse existing helpers and components, prefer platform features, no new dependency for a few lines, no unrequested options or abstractions.");
+    lines.push("- Never cut validation at trust boundaries, auth checks, data-loss error handling, or accessibility.");
+  }
+  if (caveman) {
+    lines.push("");
+    lines.push("### Reply style (caveman)");
+    lines.push("- Answer first, with exact technical facts. Skip filler, preamble and recap. End edit replies with the target `file:line`, the change, and the check you ran.");
   }
   lines.push("");
-
-  lines.push(`### Available MCP Tools & CLI Commands (v${FULLSTACK_AUDIT_VERSION} Engine)`);
-  lines.push("- **Native MCP Tools**: `fullstack_find`, `fullstack_locate_visual`, `fullstack_resolve`, `fullstack_path`, `fullstack_symbol`, `fullstack_patch`, `fullstack_audit`");
-  lines.push("- `/fullstack-audit` or `npm run audit`: Regenerates the entire Fullstack Atlas and root `llms.txt` / `llms-full.txt`.");
-  lines.push("- `npx fullstack-audit --find <query> --compact`: Ultra-fast, sub-3ms token-compact query mode for AI agents.");
-  lines.push("- `npx fullstack-audit --locate-visual <query>`: 0ms visual element locator (pulse dots, capsule pills, status badges, icons).");
-  lines.push("- `npx fullstack-audit --resolve <name>`: Fuzzy case-insensitive component & file resolver.");
-  lines.push("- `npx fullstack-audit --path <from> <to>`: Sub-5ms causal execution path finder (UI button -> Action -> DB model).");
-  lines.push("- `npx fullstack-audit --symbol <method>`: Line-bound surgical slicer for functions/methods in God-files.");
-  lines.push("- `npx fullstack-audit --patch <file> --target \"<old>\" --replace \"<new>\"`: CRLF-agnostic surgical patcher (immune to PowerShell `&` syntax crashes).");
-  lines.push("- `npx fullstack-audit --setup-all [--standalone | --profile <profile>]`: Configures Cursor (.mdc), Claude Code, Hermes Agent, and OpenCode.");
-  lines.push("- `npx fullstack-audit --theme --route <route> --compact`: Generates a route-scoped micro-punchlist (saves 99.8% tokens).");
-  lines.push("- `npx fullstack-audit --verify --gate-clean [--route <route>]`: Smart multi-target verification gate.");
-  lines.push("- `npx fullstack-audit --solo`: Enforces strictly Single-Agent execution (no subagents).");
-  lines.push("- `npx fullstack-audit --multi-agent`: Partitions codebase into 4 parallel zone briefs for rapid Map-Reduce sweeps.");
-  lines.push("- `npx fullstack-audit --llms`: Generates root `llms.txt` and `llms-full.txt` (Answer.AI specification).");
-  lines.push("- `npx fullstack-audit --graph`: Exports knowledge graph to `docs/graph.json` (NetworkX / Graphify schema).");
-  lines.push("- `npx fullstack-audit --diff`: Architecture delta report comparing current scan against `.last_receipt.json`.");
-  lines.push("- `npx fullstack-audit --migrate-theme --from \"#hex1,#hex2\" --to \"dark:bg-slate-900\"`: CRLF-agnostic AST codemod in 80ms (0 LLM output tokens).");
-  lines.push("- `npx fullstack-audit --manifest <file:line>`: Generates zero-search agent handoff manifest.");
-  lines.push("- `npx fullstack-audit --watch`: Live background file watcher for continuous background sync.");
-  lines.push("- `npx fullstack-audit --dead`: Scans for potential orphaned components.");
+  lines.push("### Commands");
+  lines.push("- MCP tools: `fullstack_find`, `fullstack_locate_visual`, `fullstack_resolve`, `fullstack_path`, `fullstack_symbol`, `fullstack_patch`, `fullstack_audit`");
+  lines.push("- `/fullstack-audit` or `npx fullstack-audit`: rebuild the atlas and `docs/llms.txt`");
+  lines.push("- `npx fullstack-audit --theme --route <route> --compact`: design-token punchlist for one route");
+  lines.push("- `npx fullstack-audit --verify --gate-clean`: typecheck and atlas gate");
+  lines.push("- `npx fullstack-audit --diff`: architecture changes since the last scan");
+  lines.push("- `npx fullstack-audit --dead`: components that nothing imports");
   lines.push("<!-- END_FRONTEND_AUDIT_RULE -->");
   lines.push("<!-- END_FULLSTACK_AUDIT_RULE -->");
-
   return lines.join("\n");
 }
 
@@ -4496,7 +4326,7 @@ export function executeFuzzyFileResolver(query: string, rootDir: string = ROOT_D
   return true;
 }
 
-// 11.7b Visual 0ms Element Locator (Live Dots, Capsule Pills, Icons, Labels)
+// 11.7b Visual Element Locator (Live Dots, Capsule Pills, Icons, Labels)
 export function executeVisualLocator(query: string, outputDir: string = OUTPUT_DIR): boolean {
   if (!query) {
     console.error("❌ Error: Missing query for --locate-visual. Usage: npx fullstack-audit --locate-visual '<query>'");
@@ -4546,7 +4376,7 @@ export function executeVisualLocator(query: string, outputDir: string = OUTPUT_D
       return true;
     }
 
-    console.log(`🎯 [VISUAL LOCATOR: 0ms Match] Found ${hits.length} visual element(s) for "${query}":\n`);
+    console.log(`🎯 [VISUAL LOCATOR] Found ${hits.length} visual element(s) for "${query}":\n`);
     hits.slice(0, 8).forEach(h => {
       const e = h.entry;
       const metaStr = e.meta ? ` [${e.meta}]` : "";
@@ -4571,7 +4401,7 @@ export function executePathTracer(fromQuery: string, toQuery: string, rootDir: s
   let nodes: any[] = [];
   let links: any[] = [];
 
-  // 1. Fast-Path A: In-memory pre-computed causalGraph from .atlas-index.json (0ms)
+  // 1. Fast-Path A: In-memory pre-computed causalGraph from .atlas-index.json 
   const indexPath = path.join(rootDir, "docs", "frontend-atlas", ".atlas-index.json");
   if (fs.existsSync(indexPath)) {
     try {
@@ -4895,7 +4725,7 @@ export function writeTestSuitesMap(testCases: TestCaseAudit[], outputDir: string
     md += `| \`${t.relPath}\` (${t.suite}) | **${t.testTitle}** | L${t.line} | \`view_file(StartLine=${startL}, EndLine=${endL}, Path="${t.relPath}")\` |\n`;
   });
 
-  md += `\n## 💡 Sub-3ms Fast Test Lookup\n\n`;
+  md += `\n## 💡 Fast Test Lookup\n\n`;
   md += `Run \`npx fullstack-audit --find "<failing-test-title>" --compact\` to instantly jump to the exact file and line of any failing assertion without recursive grep.\n\n`;
 
   fs.writeFileSync(filePath, md, "utf-8");
@@ -4912,9 +4742,11 @@ function mergeMcpConfig(targetJsonPath: string): boolean {
       } catch {}
     }
     if (!config.mcpServers) config.mcpServers = {};
+    // shortcut: absolute path to this install, so the config breaks if the engine moves; switch to a published bin name once on npm
+    const mcpServerPath = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "bin", "mcp-server.js").replace(/\\/g, "/");
     config.mcpServers["fullstack-audit"] = {
       command: "node",
-      args: ["bin/mcp-server.js"]
+      args: [mcpServerPath]
     };
     fs.writeFileSync(targetJsonPath, JSON.stringify(config, null, 2), "utf-8");
     return true;
@@ -4986,42 +4818,6 @@ export function executeDoctorCheck(): boolean {
   return issues === 0;
 }
 
-export function executeRoiReport(): boolean {
-  console.log(`┌────────────────────────────────────────────────────────────────────────┐`);
-  console.log(`│             FULLSTACK AUDIT — DEVELOPER ROI & TOKEN SAVINGS            │`);
-  console.log(`├────────────────────────────────────────────────────────────────────────┤`);
-
-  const indexPath = path.join(OUTPUT_DIR, ".atlas-index.json");
-  let entryCount = 420;
-  let fileCount = 65;
-  if (fs.existsSync(indexPath)) {
-    try {
-      const idx: AtlasIndex = JSON.parse(fs.readFileSync(indexPath, "utf-8"));
-      entryCount = idx.totalEntries || 420;
-      fileCount = idx.files?.length || 65;
-    } catch {}
-  }
-
-  const vanillaTokensPerQuery = Math.max(45000, fileCount * 800);
-  const auditTokensPerQuery = 45;
-  const tokenSavingsPct = "99.8%";
-
-  console.log(`│ Project Workspace: ${path.basename(ROOT_DIR).padEnd(20)} Indexed: ${entryCount.toString().padEnd(4)} Symbols | ${fileCount.toString().padEnd(3)} Files │`);
-  console.log(`├────────────────────────────────────────────────────────────────────────┤`);
-  console.log(`│ Metric                   Vanilla AI Assistant    With Fullstack Audit │`);
-  console.log(`│ Median Lookup Latency    2,391 ms (15s lag)      0.35 ms (<1ms p50)   │`);
-  console.log(`│ Context Tokens / Query   ~${vanillaTokensPerQuery.toLocaleString().padEnd(8)} tokens       ${auditTokensPerQuery} tokens (${tokenSavingsPct} saved) │`);
-  console.log(`│ AMSI / Defender Freeze   15–30s per grep         0 ms (In-Memory RAM) │`);
-  console.log(`│ Child Process Spawns     1 per search            0 (Stdio Daemon)     │`);
-  console.log(`├────────────────────────────────────────────────────────────────────────┤`);
-  console.log(`│ Estimated Session Savings (50 Prompts / Day):                          │`);
-  console.log(`│ • Context Tokens Saved:  ~15.4 Million tokens / day                    │`);
-  console.log(`│ • AI API Cost Saved:     ~$46.20 / day ($1,386 / month)                │`);
-  console.log(`│ • Developer Time Saved:  ~12.5 minutes of terminal freeze / day        │`);
-  console.log(`└────────────────────────────────────────────────────────────────────────┘\n`);
-  return true;
-}
-
 function executeUniversalSetup(opts: { cursor?: boolean; claude?: boolean; hermes?: boolean; opencode?: boolean }) {
   console.log(`🚀 Initializing Universal Multi-Harness Setup Engine (v${FULLSTACK_AUDIT_VERSION})...\n`);
   const profileOpts = resolveProfileOptions();
@@ -5039,7 +4835,7 @@ function executeUniversalSetup(opts: { cursor?: boolean; claude?: boolean; herme
     if (!fs.existsSync(cursorDir)) fs.mkdirSync(cursorDir, { recursive: true });
     const cursorRule = [
       "---",
-      "description: Zero-Grep Fullstack Architecture & Component Lookup Protocol",
+      "description: Fullstack atlas lookup protocol (routes, components, tokens, APIs, DB models)",
       "globs: \"**/*.{ts,tsx,jsx,js,vue,svelte,astro,css,prisma,sql}\"",
       "alwaysApply: true",
       "---",
@@ -5057,7 +4853,7 @@ function executeUniversalSetup(opts: { cursor?: boolean; claude?: boolean; herme
 
     const commands: Record<string, string> = {
       "audit.md": `---\ndescription: Regenerate entire fullstack atlas and Answer.AI llms.txt\n---\nRun \`npx fullstack-audit\` to regenerate both frontend and backend atlases.\n`,
-      "find.md": `---\ndescription: Instant sub-3ms lookup across fullstack atlas\narguments:\n  - name: query\n    description: Symbol, component, route, or text to locate\n    required: true\n---\nRun \`npx fullstack-audit --find "$ARGUMENTS" --compact\` and read the exact target file. Do not run global codebase grep.\n`,
+      "find.md": `---\ndescription: Look up a symbol, component, route or label in the fullstack atlas\narguments:\n  - name: query\n    description: Symbol, component, route, or text to locate\n    required: true\n---\nRun \`npx fullstack-audit --find "$ARGUMENTS" --compact\`, then read the target file to confirm. If there is no hit, use normal search.\n`,
       "diff.md": `---\ndescription: Architecture delta report comparing current scan against last receipt\n---\nRun \`npx fullstack-audit --diff\` to check architecture deltas and regressions.\n`,
       "theme.md": `---\ndescription: Generate theme migration punchlist\n---\nRun \`npx fullstack-audit --theme\` to generate THEME_MIGRATION_PUNCHLIST.md.\n`,
       "verify.md": `---\ndescription: Verify closed-loop TypeScript and clean gate\n---\nRun \`npx fullstack-audit --verify --gate-clean\` to verify typecheck and metric deltas.\n`
@@ -5114,7 +4910,7 @@ function executeUniversalSetup(opts: { cursor?: boolean; claude?: boolean; herme
     const hermesSkill = [
       "---",
       "name: fullstack-audit",
-      "description: Universal fullstack architecture and design system atlas. Zero-grep lookup for routes, components, design tokens, query keys, API routes, and DB models.",
+      "description: Universal fullstack architecture and design system atlas. Structural lookup for routes, components, design tokens, query keys, API routes, and DB models, alongside normal search.",
       "---",
       "",
       "# Fullstack Audit Skill (Hermes Agent Specification)",
@@ -5146,7 +4942,7 @@ function executeUniversalSetup(opts: { cursor?: boolean; claude?: boolean; herme
     const openCodeSkill = [
       "---",
       "name: fullstack-audit",
-      "description: Universal fullstack architecture atlas and zero-grep lookup engine.",
+      "description: Universal fullstack architecture atlas and structural lookup engine.",
       "---",
       "",
       ruleLines
@@ -5166,7 +4962,7 @@ function executeUniversalSetup(opts: { cursor?: boolean; claude?: boolean; herme
     } else {
       fs.writeFileSync(conventionsPath, `# Aider Workspace Conventions\n\n${ruleLines}\n`, "utf-8");
     }
-    console.log("✅ Aider: Configured CONVENTIONS.md with Zero-Grep Atlas protocol");
+    console.log("✅ Aider: Configured CONVENTIONS.md with the atlas protocol");
   }
 
   // 9. Root AGENTS.md (Universal standard)
@@ -5362,7 +5158,7 @@ export function runUniversalFrontendAudit() {
 
   writeAtlasSummary(audits, routeMaps, structure, deadComponents, queryTopology, godFiles);
 
-  // Generate .atlas-index.json for sub-3ms CLI lookups
+  // Generate .atlas-index.json for CLI and MCP lookups
   buildAndSaveAtlasIndex(audits, routeMaps, queryTopology, godFiles, testCases, OUTPUT_DIR);
 
   // Generate docs/graph.json (NetworkX / Graphify node_link_data standard - Opt-in via --graph)
@@ -6272,7 +6068,7 @@ function writeVisibleLabelsMap(audits: ComponentAudit[]) {
   const filePath = path.join(OUTPUT_DIR, "06_VISIBLE_TEXT_AND_LABELS_MAP.md");
   let md = getAtlasProvenanceHeader(
     "🏷️ Visible Text & UI Labels Map",
-    "Comprehensive index of visible buttons, headings, badges, and accessible labels across all panels.\n> 💡 **Screenshot-to-Code**: When matching a UI element from a screenshot, find the visible text label here to locate the exact component file and line in 0ms."
+    "Comprehensive index of visible buttons, headings, badges, and accessible labels across all panels.\n> 💡 **Screenshot-to-Code**: When matching a UI element from a screenshot, find the visible text label here to find the component file and line."
   );
 
   const allLabels: { zone: string; file: string; line: number; text: string; type: string; snippet: string }[] = [];
@@ -6309,7 +6105,7 @@ function writeVisualIconIndex(audits: ComponentAudit[]) {
   const filePath = path.join(OUTPUT_DIR, "07_VISUAL_AND_ICON_INDEX.md");
   let md = getAtlasProvenanceHeader(
     "🖼️ Visual Icons & Action Symbols Index",
-    "Comprehensive index of Lucide, Radix, Tabler, and SVG visual action icons across all panels.\n> 💡 **Screenshot-to-Code**: When matching icon-only buttons or visual badges from a screenshot (where no text exists), look up the icon name here to locate the exact file and line in 0ms."
+    "Comprehensive index of Lucide, Radix, Tabler, and SVG visual action icons across all panels.\n> 💡 **Screenshot-to-Code**: When matching icon-only buttons or visual badges from a screenshot (where no text exists), look up the icon name here to find the file and line."
   );
 
   const allIcons: { zone: string; file: string; line: number; iconName: string; sourceLib: string; context: string; snippet: string }[] = [];
@@ -6703,7 +6499,7 @@ function generateLlmsStandardFiles(routes: RouteMapItem[], structure?: ProjectSt
   llmsTxt += `- [09_QUERY_AND_CACHE_MAP.md](docs/frontend-atlas/09_QUERY_AND_CACHE_MAP.md): TanStack React Query cache keys, mutations, and reactive invalidation topology.
 - [10_GOD_FILES_SURGICAL_MAP.md](docs/frontend-atlas/10_GOD_FILES_SURGICAL_MAP.md): Monolithic God-File Complexity Radar & Surgical Slicer (exact line ranges for LLMs).
 - [11_ROUTE_COMPLEXITY_AND_BLAST_RADIUS.md](docs/frontend-atlas/11_ROUTE_COMPLEXITY_AND_BLAST_RADIUS.md): Fullstack Route Complexity & Blast-Radius Radar (safety checklists & component fan-out).
-- [12_TEST_SUITES_AND_COVERAGE_MAP.md](docs/frontend-atlas/12_TEST_SUITES_AND_COVERAGE_MAP.md): Pre-indexed registry of test suites, test cases, and assertions for zero-grep test debugging.\n\n`;
+- [12_TEST_SUITES_AND_COVERAGE_MAP.md](docs/frontend-atlas/12_TEST_SUITES_AND_COVERAGE_MAP.md): Pre-indexed registry of test suites, test cases, and assertions for test debugging.\n\n`;
 
   llmsTxt += `## Backend Architecture\n`;
   llmsTxt += `- [01_API_ROUTES_AND_ENDPOINTS.md](docs/backend-atlas/01_API_ROUTES_AND_ENDPOINTS.md): HTTP API routes, methods, and auth protection guards.\n`;
@@ -6801,8 +6597,8 @@ async function main() {
   }
 
   if (ROI_MODE) {
-    executeRoiReport();
-    process.exit(0);
+    console.log("--roi was removed in v2.17.1: it printed fixed estimates, not measurements.");
+    process.exit(1);
   }
 
   if (RAG_QUERY) {
@@ -6917,7 +6713,7 @@ async function main() {
     process.exit(success ? 0 : 1);
   }
 
-  // Fast-Path for Symbol/Component/Route/Action Lookups (Sub-3ms)
+  // Fast-Path for Symbol/Component/Route/Action Lookups (index read)
   if (FIND_QUERY && !DIFF_MODE && !SHOULD_FIX_BUTTONS && !MIGRATE_THEME_MODE && !VERIFY_MODE) {
     const fastMatched = executeFastAtlasFind(FIND_QUERY, COMPACT_MODE);
     if (fastMatched) return;

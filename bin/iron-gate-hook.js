@@ -1,125 +1,90 @@
 #!/usr/bin/env node
 
 /**
- * Iron Gate Anti-Grep PreToolUse Lifecycle Hook (v2.15.0)
- * Intercepts and denies slow recursive directory scans (Get-ChildItem -Recurse, grep -r, find, Select-String, git grep)
- * preventing 15-30s Windows Defender / AMSI freezes and context bloat.
- * Compatible with Google Antigravity, Gemini CLI, and Claude Code PreToolUse hooks.
+ * Iron Gate PreToolUse hook.
+ * Blocks only unscoped recursive directory walks from Windows shells (PowerShell Get-ChildItem -Recurse,
+ * cmd dir /s, findstr /s, [IO.Directory]::GetFiles). Those walk node_modules/.next and can freeze for
+ * 15-30s under Windows Defender. Scoped walks (e.g. `Get-ChildItem src -Recurse`), ripgrep, git grep and
+ * the agent's built-in Grep/Glob tools are allowed: they are fast or already skip ignored folders.
+ *
+ * Claude Code: exit 2 + stderr blocks the call. Antigravity / Gemini CLI: JSON {decision} on stdout.
  */
 
 import fs from "fs";
+import { fileURLToPath } from "url";
 
-function run() {
-  let raw = "";
-  try {
-    raw = fs.readFileSync(0, "utf-8");
-  } catch {
-    console.log(JSON.stringify({ decision: "allow" }));
-    return;
+// Flags whose next token is a value, not a path.
+const VALUE_FLAGS = /^-(?:filter|include|exclude|depth|attributes|name)$/i;
+const ROOT_TARGETS = new Set([".", "./", ".\\", "*", "/", "\\", "~"]);
+
+/** True when the walk has no folder argument, or targets the project root. */
+function isUnscoped(tokens) {
+  const paths = [];
+  for (let i = 0; i < tokens.length; i++) {
+    const t = tokens[i];
+    if (VALUE_FLAGS.test(t)) { i++; continue; }
+    if (/^-path$|^-literalpath$/i.test(t)) { if (tokens[i + 1]) paths.push(tokens[++i]); continue; }
+    if (t.startsWith("-") || t.startsWith("/")) continue;
+    paths.push(t);
   }
-
-  if (!raw || !raw.trim()) {
-    console.log(JSON.stringify({ decision: "allow" }));
-    return;
-  }
-
-  let payload;
-  try {
-    payload = JSON.parse(raw);
-  } catch {
-    console.log(JSON.stringify({ decision: "allow" }));
-    return;
-  }
-
-  const toolCall = payload.toolCall || {};
-  const args = toolCall.args || payload.tool_input || {};
-  const cmd = args.CommandLine || args.command || args.cmd || "";
-  const isClaudeCode = Boolean(payload.tool_name);
-
-  if (!cmd || typeof cmd !== "string") {
-    console.log(JSON.stringify({ decision: "allow" }));
-    return;
-  }
-
-  const forbiddenRules = [
-    {
-      regex: /(?:Get-ChildItem|gci|dir|ls)\s+[^|\n\r]*(?:[-/]Recurse|[-/]s\b|-[a-zA-Z]*r\b)/i,
-      desc: "Get-ChildItem -Recurse / dir /s / gci -r recursive file scan",
-    },
-    {
-      regex: /Select-String\s+[^|\n\r]*-(?:Path|Include)\s+[^|\n\r]*\*/i,
-      desc: "Select-String recursive wildcard file scan",
-    },
-    {
-      regex: /\|\s*Select-String\b/i,
-      condition: (c) => /(?:Get-ChildItem|gci|dir|ls)/i.test(c),
-      desc: "Directory listing piped to Select-String",
-    },
-    {
-      regex: /\b(?:grep|egrep)\s+-[a-zA-Z]*[rR]/i,
-      desc: "grep -r recursive search",
-    },
-    {
-      regex: /\bgit\s+grep\b/i,
-      desc: "git grep recursive repository search",
-    },
-    {
-      regex: /\b(?:rg|ripgrep)\s+-[a-zA-Z]*[rR]|\b(?:rg|ripgrep)\s+["'][^"']+["']\s*$/i,
-      desc: "ripgrep global un-scoped search",
-    },
-    {
-      regex: /\bfind\s+(?:\.|\/|[a-zA-Z0-9_\-'"\\]+)\s+-[a-zA-Z]*name/i,
-      desc: "find recursive search",
-    },
-    {
-      regex: /\bfindstr\s+[^|\n\r]*\/s/i,
-      desc: "findstr /s recursive search",
-    },
-    {
-      regex: /node\s+-e\s+.*(?:readdir|walk)/i,
-      desc: "node -e inline directory scanner",
-    },
-    {
-      regex: /python(?:\.exe)?\s+-c\s+.*os\.walk/i,
-      desc: "python inline recursive directory scanner",
-    },
-    {
-      regex: /\[(?:System\.)?IO\.(?:Directory|File)\]::(?:GetFiles|EnumerateFiles|ReadAllText)/i,
-      desc: "PowerShell [IO.Directory/File] batch reading script",
-    },
-  ];
-
-  for (const rule of forbiddenRules) {
-    if (rule.regex.test(cmd)) {
-      if (rule.condition && !rule.condition(cmd)) {
-        continue;
-      }
-      const reason = [
-        `IRON GATE REJECTED: ${rule.desc} is strictly prohibited.`,
-        "Recursive directory scans trigger 15-30s Windows Defender / AMSI freezes and waste context tokens.",
-        "",
-        "INSTEAD USE ZERO-GREP FULLSTACK ATLAS TOOLS:",
-        "- Symbol / Label / Route Search: fullstack_find(query: \"<word>\") or npx fullstack-audit --find \"<word>\" --compact (<0.3ms)",
-        "- Visual Element / Badge / Icon: fullstack_locate_visual(query: \"<element>\")",
-        "- Imports & Dependencies: Read docs/backend-atlas/06_FULLSTACK_CROSS_REFERENCE_MAP.md or call fullstack_path",
-        "- God-File Slicer: fullstack_symbol(symbol: \"<method>\")",
-        "- Pre-Computed Atlases: View docs/frontend-atlas/ or docs/backend-atlas/"
-      ].join("\n");
-
-      if (isClaudeCode) {
-        process.stderr.write(reason + "\n");
-        process.exit(2);
-      }
-
-      console.log(JSON.stringify({
-        decision: "deny",
-        reason: reason
-      }));
-      return;
-    }
-  }
-
-  console.log(JSON.stringify({ decision: "allow" }));
+  return paths.length === 0 || paths.every((p) => ROOT_TARGETS.has(p.replace(/^['"]|['"]$/g, "")));
 }
 
-run();
+/** Returns a reason string when the command must be blocked, else null. */
+export function checkCommand(cmd) {
+  if (!cmd || typeof cmd !== "string") return null;
+  for (const segment of cmd.split(/[|;&\n]/)) {
+    const tokens = segment.trim().split(/\s+/).filter(Boolean);
+    if (tokens.length === 0) continue;
+    const head = tokens[0].toLowerCase();
+    const rest = tokens.slice(1);
+
+    if (["get-childitem", "gci"].includes(head) && rest.some((t) => /^-recurse$/i.test(t)) && isUnscoped(rest)) {
+      return "Get-ChildItem -Recurse on the project root";
+    }
+    if (head === "dir" && rest.some((t) => /^\/s$/i.test(t)) && isUnscoped(rest)) {
+      return "dir /s on the project root";
+    }
+    if (head === "findstr" && rest.some((t) => /^\/s$/i.test(t))) {
+      return "findstr /s recursive search";
+    }
+  }
+  if (/\[(?:System\.)?IO\.Directory\]::(?:GetFiles|EnumerateFiles)\([^)]*AllDirectories/i.test(cmd)) {
+    return "[IO.Directory]::GetFiles with AllDirectories";
+  }
+  return null;
+}
+
+function run() {
+  let payload = {};
+  try {
+    payload = JSON.parse(fs.readFileSync(0, "utf-8") || "{}");
+  } catch {
+    // Unreadable input: never block on our own parsing failure.
+  }
+  const args = payload.tool_input || payload.toolCall?.args || {};
+  const cmd = args.command || args.CommandLine || args.cmd || "";
+  const isClaudeCode = Boolean(payload.tool_name);
+  const blocked = checkCommand(cmd);
+
+  if (!blocked) {
+    if (!isClaudeCode) console.log(JSON.stringify({ decision: "allow" }));
+    return;
+  }
+
+  const reason = [
+    `Blocked: ${blocked}. An unscoped recursive walk enters node_modules/.next and can freeze for 15-30s on Windows.`,
+    "Instead:",
+    "- Atlas lookup: the fullstack_find / fullstack_locate_visual / fullstack_path MCP tools",
+    "- Text search: your Grep tool, `rg <pattern> <dir>`, or `git grep <pattern>` (all skip ignored folders)",
+    "- Or scope the walk to a folder: Get-ChildItem src -Recurse -Filter *.tsx",
+  ].join("\n");
+
+  if (isClaudeCode) {
+    process.stderr.write(reason + "\n");
+    process.exit(2);
+  }
+  console.log(JSON.stringify({ decision: "deny", reason }));
+}
+
+if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) run();

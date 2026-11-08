@@ -30,9 +30,9 @@ Before writing any code or answering user tasks, follow the **Orthogonal 4-Phase
 
 ```
 Phase 1: GPS / LOCATE (fullstack-audit)
-  ➔ 0ms Atlas lookup (docs/frontend-atlas/ or docs/backend-atlas/ or npx fullstack-audit --find "<query>" --compact)
-  ➔ HARD FORBIDDEN: Do NOT run full-codebase recursive greps (Select-String / grep -r).
-  ➔ IMMEDIATE RELINQUISHMENT: Once file:line is located, hand off to Phase 2 immediately. Fullstack Audit is NOT an animation tool.
+  ➔ Atlas lookup first (fullstack_find / fullstack_locate_visual / fullstack_path MCP tools, or docs/frontend-atlas/ and docs/backend-atlas/)
+  ➔ Confirm hits by reading the file; fall back to Grep / rg / git grep when the atlas has no hit or may be stale.
+  ➔ On Windows, avoid Get-ChildItem -Recurse on the project root (walks node_modules).
 
 Phase 2: DESIGN & KISS FIREWALL (ponytail)
   ➔ Does it need to exist? Skip unasked abstractions, wrappers, state machines, and extra options.
@@ -46,8 +46,8 @@ Phase 3: ZERO-FLUFF COMMUNICATION (caveman)
   ➔ Conclude with a Compact Diff Receipt: Target, Diff, Ponytail check, HMR status.
 
 Phase 4: RIGHT-SIZED VERIFICATION (superpowers Dual-Speed)
-  ➔ ⚡ Inner-Loop (UI/CSS/Layout/Copy ≤ 2 files, < 30 lines): Direct edit_file ➔ 50ms HMR.
-     HARD FORBIDDEN: Do NOT run tsc --noEmit, npm run typecheck, or intermediate audit scans. Return in 1–2s.
+  ➔ ⚡ Inner-Loop (UI/CSS/Layout/Copy ≤ 2 files, < 30 lines): Direct edit_file ➔ HMR.
+     Hot reload is enough for pure style/copy tweaks; run the typecheck when types, props or exports change.
   ➔ 🛡️ Outer-Loop (Backend/DB/Auth Milestones): Rigorous verification gate (npx fullstack-audit --verify --gate-clean).
      Evidence before claims. Exit code 0 proof required.
 ```
@@ -148,7 +148,7 @@ When active in a project workspace using the skill:
 | :--- | :--- |
 | **Instant Version Check (<5ms)** | `npx fullstack-audit -v` / `--version` |
 | **Detect Version Drift** | `npx fullstack-audit --check-update` |
-| **Sub-3ms Symbol Search** | `npx fullstack-audit --find "<query>" --compact` |
+| **Symbol Search** | `npx fullstack-audit --find "<query>" --compact` |
 | **Setup All 5 Harnesses** | `npx fullstack-audit --setup-all` |
 | **Theme Micro-Punchlist** | `npx fullstack-audit --theme --route <path> --compact` |
 | **Verification Gate** | `npx fullstack-audit --verify --gate-clean` |

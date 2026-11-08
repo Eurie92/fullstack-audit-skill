@@ -19,7 +19,7 @@ flowchart TD
         D["Server Actions & API Routes"]
     end
 
-    subgraph Engine ["Single-Pass AST Engine (< 350ms)"]
+    subgraph Engine ["Single-Pass Scan Engine"]
         E["TypeScript & JSX AST Parser"]
         F["Component Boundary Radar"]
         G["Tailwind Token Matrix & Rogue Hex Scanner"]
@@ -89,7 +89,7 @@ Borrowed from network analysis, the engine evaluates import and export dependenc
 ### 9. Monolithic God-File Complexity Radar & Surgical Slicer (`10_GOD_FILES_SURGICAL_MAP.md`)
 * Identifies complex files exceeding 500 lines or 25KB that degrade LLM attention.
 * Slices monolithic files into discrete AST functional blocks (components, hooks, classes, functions, types) with exact line bounds (`L{start}-L{end}`).
-* Enables AI assistants to read only the containing 20–40 line slice instead of burning 1,500 lines, **saving 88% to 99.8% of input tokens**!
+* Enables AI assistants to read only the containing 20–40 line slice instead of burning 1,500 lines, which keeps large files out of context.
 
 ### 10. API Contract & Payload Drift Detector (`06_FULLSTACK_CROSS_REFERENCE_MAP.md`)
 * Compares frontend client payloads (`fetch`, `axios`) against backend route handler parameter schemas.
@@ -120,7 +120,6 @@ This forces AI assistants to fall back to risky line-by-line edits.
 ```bash
 npx fullstack-audit --migrate-theme --from "#121110,#1E1C1A" --to "dark:bg-slate-900"
 ```
-* **Performance**: Replaces rogue tokens across 400+ files in **under 80ms**.
 * **Safety**: Preserves exact indentation, line-ending formats (`\r\n` or `\n`), and Radix UI / accessibility attributes.
 * **Token Savings**: Consumes **0 LLM output tokens** because the transformation runs natively on CPU.
 
@@ -154,9 +153,9 @@ A common trap in AI-assisted development across modern coding harnesses (**Antig
 flowchart LR
     subgraph InnerLoop ["⚡ Inner-Loop: Fast Mode (1–2s responses)"]
         direction TB
-        A1["Developer Request<br/>(Text or Screenshot)"] --> A2["Instant Atlas Read<br/>(06_VISIBLE_TEXT / 07_VISUAL_INDEX in 0ms)"]
+        A1["Developer Request<br/>(Text or Screenshot)"] --> A2["Instant Atlas Read<br/>(06_VISIBLE_TEXT / 07_VISUAL_INDEX)"]
         A2 --> A3["Direct Surgical Edit<br/>(edit_file in 1s)"]
-        A3 --> A4["Native Dev Server HMR<br/>(Vite/Next.js Fast Refresh in 50ms)"]
+        A3 --> A4["Native Dev Server HMR<br/>(Vite/Next.js Fast Refresh)"]
     end
 
     subgraph OuterLoop ["🛡️ Outer-Loop: Verification Gate (Checkpoints Only)"]
@@ -180,16 +179,9 @@ Instead of launching slow headless browser automation to inspect UI elements:
 
 ---
 
-## 📊 Empirical Benchmarks
+## 📊 Benchmarks
 
-Tested on a production Next.js 15 App Router codebase (**448 files, 50 routes, Tailwind CSS, Prisma backend**):
-
-| Real-World Task | Vanilla Agent (`Select-String`) | `fullstack-audit` (Atlas Read) | Proven Improvement |
-| :--- | :---: | :---: | :--- |
-| **Task 1: Screenshot-to-Code Localization**<br>*(Find `"WHOLESALE COMMERCE SUITE"`)* | **42,961 ms** | **3 ms** | **⚡ 14,320x Faster**<br>85.7% Token Reduction |
-| **Task 2: Rogue Hardcoded Color Detection**<br>*(Find un-themed `#121110` / `#1E1C1A`)* | **39,595 ms** | **8 ms** | **⚡ 4,949x Faster**<br>Structured token matrix vs noisy text dump |
-| **Task 3: Fullstack Route Hierarchy Trace**<br>*(Trace `/portal/reseller` with Server/Client boundaries)* | **35,142 ms** | **2 ms** | **⚡ 17,571x Faster**<br>Preserves Server vs Client boundary |
-| **TOTAL BENCHMARK DURATION** | **117,698 ms (~2.0 min)** | **13 ms (0.013s)** | **🚀 9,053.7x FASTER** |
+The table that used to be here compared one-off PowerShell `Select-String` runs with in-memory atlas reads. It was not an agent benchmark and was removed in v2.17.1. A reproducible with/without-plugin agent eval is planned (see README > Benchmarks).
 
 ---
 

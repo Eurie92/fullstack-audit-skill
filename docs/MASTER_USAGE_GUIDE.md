@@ -1,18 +1,18 @@
-# Unlocking the Full Potential of fullstack-audit (v2.17.0 Master Guide)
+# Unlocking the Full Potential of fullstack-audit (v2.17.1 Master Guide)
 
 > **The definitive operational playbook for software engineers and AI coding assistants (Antigravity, Cursor, Claude Code, Windsurf, Codex, VS Code).**
 
 ---
 
-## The Core Philosophy: "Zero-Grep, Zero-Hallucination"
+## The Core Philosophy: Structure First, Search Second
 
-Modern web codebases (Next.js, Vite React, Nuxt 3, SvelteKit, Astro, Remix) grow rapidly. When developers or AI assistants try to understand or modify them using raw grep (`Select-String` or `grep -r`), they suffer from:
-1. **Localization Errors & Hallucinations**: Over 64% of AI failures stem from reading minified build output (`.next/`, `dist/`, `.output/`) or hallucinating paths.
-2. **Context Window Blowup & Token Costs**: Reading massive 1,000+ line files burns 100,000+ tokens and degrades LLM reasoning (*Lost in the Middle effect*).
-3. **Hidden Blast-Radius Regressions**: Modifying a shared component or API route breaks dependent pages without warning.
-4. **Per-Edit Latency Traps**: Running headless browser MCP automation or full TypeScript typechecks on every single micro-edit slows iterations to 45–60 seconds per change.
+Modern web codebases (Next.js, Vite React, Nuxt 3, SvelteKit, Astro, Remix) grow rapidly. Text search finds strings well, but some questions need structure:
+1. **Visual elements** (a pulse dot, a pill, an icon-only button) have no unique name to search for.
+2. **Cross-file flows** (button -> server action -> DB model) take several searches to reconstruct.
+3. **Large files**: reading a whole 1,000+ line file to change one function wastes context.
+4. **Blast radius**: changing a shared component or API route can break pages that are not obvious from one search.
 
-`fullstack-audit` solves this by pre-indexing the entire codebase in **under 350ms** into deterministic, human-readable Markdown atlases on disk (`docs/frontend-atlas/` and `docs/backend-atlas/`), establishing a **Dual-Speed Loop (1–2s responses)**.
+`fullstack-audit` solves this by pre-indexing the codebase into deterministic, human-readable Markdown atlases on disk (`docs/frontend-atlas/` and `docs/backend-atlas/`), that agents query next to their normal search tools.
 
 ---
 
@@ -23,7 +23,7 @@ Fullstack Audit is an always-on architectural companion across all three phases:
 | Phase | Purpose | Recommended Commands & Actions |
 | :--- | :--- | :--- |
 | **Before Development** | Codebase orientation, route mapping, and mental model acquisition | Type `/fullstack-audit` in chat or run `npx.cmd fullstack-audit`. Generates all 20 atlases and root `llms.txt`. |
-| **During Development** | Sub-3ms symbol extraction and surgical single-function reads | AI assistant autonomously invokes `--symbol`, `--resolve`, and `--patch` to avoid reading 1,000+ line God-files. |
+| **During Development** | Symbol lookup and single-function reads | AI assistant autonomously invokes `--symbol`, `--resolve`, and `--patch` to avoid reading 1,000+ line God-files. |
 | **After Development** | Secret leak scanning, blast radius check, and verification gate | Inspect `07_ENV_AND_SECRETS_MAP.md`, check `11_ROUTE_COMPLEXITY_AND_BLAST_RADIUS.md`, and run `npx fullstack-audit --verify --gate-clean`. |
 
 ---
@@ -42,9 +42,9 @@ docs/
 │   ├── 07_VISUAL_AND_ICON_INDEX.md         # Action icons & SVG symbol registry
 │   ├── 08_DISPATCH_GATEWAY.md              # Multi-skill routing matrix
 │   ├── 09_QUERY_AND_CACHE_MAP.md           # React Query keys, invalidation triggers & Cache Hygiene Radar
-│   ├── 10_GOD_FILES_SURGICAL_MAP.md        # Monolithic files sliced into AST line bounds (88-99.8% token savings)
+│   ├── 10_GOD_FILES_SURGICAL_MAP.md        # Monolithic files sliced into AST line bounds
 │   ├── 11_ROUTE_COMPLEXITY_AND_BLAST_RADIUS.md # Composite risk scoring (0-100) & blast radius impact tiers
-│   ├── 12_TEST_SUITES_AND_COVERAGE_MAP.md  # Pre-indexed test assertions & suites registry (zero-grep test locator)
+│   ├── 12_TEST_SUITES_AND_COVERAGE_MAP.md  # Pre-indexed test assertions & suites registry (test locator)
 │   ├── THEME_MIGRATION_PUNCHLIST.md        # Actionable whole-website dark mode & color punchlist
 │   └── README.md                           # Frontend stats dashboard
 └── backend-atlas/
@@ -106,26 +106,27 @@ npx fullstack-audit --diff
 ```
 Prints an ASCII report tracking newly added routes, god files, hex deviations, and query count changes.
 
-### 6. Whole-Website Instant Rebranding in 80ms
+### 6. Whole-Website Rebranding
 Tired of manually hunting down old hex colors?
 ```bash
 npx fullstack-audit --migrate-theme --from "#121110,#1E1C1A" --to "dark:bg-slate-900"
 ```
-Replaces rogue colors across 400+ files in 80ms with 0 LLM tokens, cleanly preserving Windows CRLF or Linux LF formatting.
+Replaces rogue colors across many files in one command, without the model rewriting each file, preserving Windows CRLF or Linux LF formatting.
 
 ---
 
 ## Part 2: How AI Coding Agents Unlock Full Potential
 
-### Rule #1: The Zero-Grep Golden Rule
-Never let your AI assistant run recursive file searches (`grep -r` or `Select-String`). The first tool call MUST be reading the relevant markdown map:
+### Rule #1: Atlas First for Structural Questions
+For structural questions, start with the MCP tools (`fullstack_find`, `fullstack_locate_visual`, `fullstack_path`) or the relevant map, then confirm by reading the file. Use normal search (Grep, `rg`, `git grep`) when the atlas has no hit or may be stale. On Windows, avoid `Get-ChildItem -Recurse` on the project root.
+
 * **User attaches a screenshot with text?** -> Read `06_VISIBLE_TEXT_AND_LABELS_MAP.md`.
 * **User attaches a screenshot with an icon?** -> Read `07_VISUAL_AND_ICON_INDEX.md`.
 * **User mentions a route (e.g. `/admin/orders`)?** -> Read `01_ROUTES_AND_PANELS_MAP.md`.
 * **User mentions a database table or model?** -> Read `02_DATABASE_MODELS_AND_SCHEMA.md`.
 * **User asks to tweak colors?** -> Read `03_DESIGN_TOKENS_AND_COLORS.md`.
 
-### Rule #2: Surgical Slicing on God-Files (Save 90%+ Tokens)
+### Rule #2: Surgical Slicing on God-Files
 When an edit involves a large file (> 500 lines):
 1. The AI looks up the file in `10_GOD_FILES_SURGICAL_MAP.md` or runs:
    ```bash
@@ -133,16 +134,14 @@ When an edit involves a large file (> 500 lines):
    ```
 2. The engine returns the exact containing slice (e.g., `calculateTax` function, `L245-L280`).
 3. The AI reads **only those 35 lines** instead of the entire 1,500-line file.
-4. **Result**: 95% token savings, zero lost-in-the-middle confusion, sub-second generation.
+4. **Result**: the agent reads one function instead of the whole file.
 
 ### Rule #3: The Dual-Speed Inner Loop
 AI assistants should operate in two distinct speeds:
-* **Inner Loop (Fast Mode - 1 to 2s responses)**:
-  * Apply surgical edits directly via `edit_file`.
-  * Let the running dev server (Next.js/Vite HMR) update the user's monitor in 50ms.
-  * **Prohibited**: Headless browser MCP tools (Chrome DevTools MCP / Puppeteer) and full TypeScript compilation on micro-edits.
-* **Outer Loop (Verification Gate)**:
-  * Run `npx fullstack-audit --verify --gate-clean` only when the entire task is done or before committing to git.
+* **Inner Loop (style and copy tweaks)**:
+  * Apply edits directly via `edit_file` and let the dev server (Next.js/Vite HMR) update the browser.
+* **Outer Loop (types, exports, logic, backend, DB, auth)**:
+  * Run the typecheck and tests (`npm run typecheck`, `npm test`, or `npx fullstack-audit --verify --gate-clean`) before calling the change done.
 
 ### Rule #4: Multi-Agent Parallel Swarms (`--multi-agent`)
 For large-scale codebase migrations or rebrands:
@@ -166,7 +165,7 @@ Spawn 4 subagents in parallel to execute edits across their respective zones wit
 2. **AI Action**: Reads `docs/frontend-atlas/06_VISIBLE_TEXT_AND_LABELS_MAP.md` for `"Export CSV"`.
 3. **Instant Hit**: Finds `components/admin/OrdersTable.tsx:142`.
 4. **Edit**: Calls `edit_file` to replace `bg-blue-600` with `bg-emerald-600`.
-5. **Outcome**: UI refreshes on localhost in 50ms. Total agent time: **2 seconds**.
+5. **Outcome**: UI refreshes on localhost via HMR.
 
 ### Scenario B: "Add a field to an existing API route and UI form"
 1. **Developer**: *"Add a phone number field to the customer profile update"*.
@@ -213,11 +212,10 @@ Spawn 4 subagents in parallel to execute edits across their respective zones wit
 | **Audit whole project** | `npx fullstack-audit` or `npm run audit` |
 | **Hybrid Code RAG retrieval (BM25 + Synonyms)** | `npx fullstack-audit --rag "<query>"` |
 | **Environment & Harness Health Check** | `npx fullstack-audit --doctor` |
-| **Token & AMSI Defender ROI Report** | `npx fullstack-audit --roi` |
 | **Configure multi-harness profiles & MCPs** | `npx fullstack-audit --setup-all [--standalone \| --profile <profile>]` |
 | **Locate a UI element by text** | Read `docs/frontend-atlas/06_VISIBLE_TEXT_AND_LABELS_MAP.md` |
 | **Locate an action icon** | Read `docs/frontend-atlas/07_VISUAL_AND_ICON_INDEX.md` |
-| **Resolve component name & casing in 0ms** | `npx fullstack-audit --resolve <name>` |
+| **Resolve component name & casing** | `npx fullstack-audit --resolve <name>` |
 | **Slice a 1,000-line God file / method bounds** | `npx fullstack-audit --symbol <method>` or `docs/frontend-atlas/10_GOD_FILES_SURGICAL_MAP.md` |
 | **CRLF-safe surgical patch (immune to & syntax)**| `npx fullstack-audit --patch <file> --target "<old>" --replace "<new>"` |
 | **Locate a test suite or failing assertion** | Read `docs/frontend-atlas/12_TEST_SUITES_AND_COVERAGE_MAP.md` or `npx fullstack-audit --find "test:<title>"` |
@@ -226,6 +224,6 @@ Spawn 4 subagents in parallel to execute edits across their respective zones wit
 | **Check route blast radius** | Read `docs/frontend-atlas/11_ROUTE_COMPLEXITY_AND_BLAST_RADIUS.md` |
 | **Check React Query cache invalidations** | Read `docs/frontend-atlas/09_QUERY_AND_CACHE_MAP.md` |
 | **Compare architectural changes** | `npx fullstack-audit --diff` |
-| **Batch re-theme colors in 80ms** | `npx fullstack-audit --migrate-theme --from "#hex" --to "token"` |
+| **Batch re-theme colors** | `npx fullstack-audit --migrate-theme --from "#hex" --to "token"` |
 | **Check TypeScript & anti-hallucination gate** | `npx fullstack-audit --verify --gate-clean` |
 | **Run parallel multi-agent swarms** | `npx fullstack-audit --multi-agent` |

@@ -3,7 +3,7 @@
  * 
  * Analyzes open-source reference repositories in docs/cloned-repos/ (or specified path),
  * catalogs their proven algorithms and architectures, and generates docs/reference-atlas/00_REFERENCE_PATTERNS.md
- * for zero-hallucination, 0ms agent pattern retrieval.
+ * for agent pattern retrieval.
  */
 
 import fs from "fs";

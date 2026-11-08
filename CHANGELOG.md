@@ -6,6 +6,39 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [2.17.1] - 2026-11-08
+
+> **Release Tier**: `PATCH (honesty, safety and agent-quality fixes from the v2.17 audit)`  
+> **Summary**: Removes benchmark numbers that were not measured, fixes data-safety bugs in the installers and MCP server, makes the Claude Code hook actually load, and rewrites the agent rules so they work with normal search instead of banning it.
+
+### Fixed
+* **`install.sh` wrote the text `undefined` into AGENTS.md / CLAUDE.md**: the rule content is now passed to the Node step.
+* **Installers downloaded an incomplete engine**: `install.sh` / `install.ps1` now also fetch `precision-patcher.ts`, `adaptive-sniffer.ts` and `reference-cataloger.ts`, which `audit.ts` imports.
+* **MCP server edited `.gitignore` on every start and every tool call**: it now does so only when `fullstack_audit` writes the atlas. The unrelated `scripts/benchmark-*.ts` entry is no longer added to user projects.
+* **`--update` downloaded raw source files over the installed engine** (and could overwrite a project's own `scripts/audit.ts` / `bin/audit.js`): it now only checks the latest version, prints package-manager upgrade steps, and refreshes rules and the atlas.
+* **Generated MCP configs pointed at a relative `bin/mcp-server.js`** that does not exist in user projects: they now use the absolute path of the installed engine.
+* **Claude Code never loaded the Iron Gate hook** (`hooks.json` used a non-standard top-level key and the Antigravity `run_command` matcher): added `hooks/hooks.json` in the Claude Code plugin format (`Bash|PowerShell`, `${CLAUDE_PLUGIN_ROOT}`).
+
+### Changed
+* **Iron Gate hook narrowed** to unscoped recursive walks from Windows shells (`Get-ChildItem -Recurse` / `dir /s` on the project root, `findstr /s`, `[IO.Directory]::GetFiles(..AllDirectories)`). `rg`, `git grep`, scoped `grep -r`, scoped `find` and `ls -lrt` are allowed. Added `test/iron-gate-hook.test.mjs`.
+* **Agent rules rewritten** (generator in `scripts/audit.ts`, AGENTS.md, rules/AGENTS.md, SKILL files, installers): atlas first for structural questions, confirm hits by reading the file, fall back to Grep / `rg` / `git grep`, verify in proportion to the change. Removed "never use rg/grep", "max tool call budget = 1", "no verification" and "no typecheck" rules. About 40 lines instead of about 95.
+* **`--gate-clean` drift check now skips test files** (`*.test.*`, `*.spec.*`, `test-*`, `test/`, `tests/`, `__tests__/`); fixture colors are not UI drift.
+* **MCP tool descriptions** now say when to use each tool instead of speed claims; tool output no longer prints "0ms" / "Sub-5ms" tags.
+* **Design-drift scan is project-neutral**: hardcoded brand hexes, `bg-void` / `bg-slab` / `border-line` classes, `.checkpoint-stage2`, reseller/supplier zone names and other project-specific labels were removed. Hexes in CSS custom property definitions are no longer flagged. `cloned-repos/` is skipped.
+* **Version strings unified** to 2.17.1 (`package.json`, `package-lock.json`, `plugin.json`, `gemini-extension.json`, `scripts/constants.ts`, `bin/mcp-server.js`).
+* `npm test` now runs the `node --test` suite in `test/` instead of the audit CLI.
+
+### Removed
+* **Synthetic benchmarks and their claims**: `scripts/benchmark-1000-flight.ts`, `benchmark-500-xnight.ts`, `benchmark-xnight.ts`, `benchmark-gate.ts`, `test/benchmark-100.ts`, both `docs/BENCHMARK_1000_*` reports, the `--flight-test` / `--flight-multi` CLI paths and the `--roi` card. Their token counts were fixed constants per trial, some latencies were fixed floors or offsets, and the baseline never ran an agent. The "0ms", "sub-3ms", "99.8% tokens saved" and "74x" claims were removed from README, docs, skills and tool descriptions. One flight script also ran `git checkout -- .` on an outside repository.
+* `scripts/anti-grep-gate.js` (an unreferenced copy of `bin/iron-gate-hook.js`).
+
+### Known limits (planned next)
+* Each CLI call still compiles the TypeScript engine with `tsx` (about 2–3 s measured); agents should prefer the MCP tools. Precompiling is planned.
+* The shipped `bin/mcp-server.js` still exposes 7 of the 10 tools defined in `scripts/mcp-server.ts`.
+* The atlas has no staleness check yet; hits can point at old line numbers after edits.
+
+---
+
 ## [2.17.0] - 2026-11-02
 
 > **Release Tier**: `MINOR (Precision Unified Diff Patcher, 1-Turn Batch Token Replacer, Adaptive Domain Sniffer, Reference Pattern Cataloger)`  
