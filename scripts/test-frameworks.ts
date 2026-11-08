@@ -815,10 +815,16 @@ async function runTestMatrix() {
     assert(adaptiveExt.detectedDomains.length >= 1, "Adaptive sniffer detected Chrome Extension domain");
     assert(fs.existsSync(path.join(extAppDir, "docs", "adaptive-atlas", "01_EXTENSION_MANIFEST_MAP.md")), "Generated 01_EXTENSION_MANIFEST_MAP.md");
 
-    // 14.5: Reference Cataloger
-    const refRes = catalogReferenceRepos("docs/cloned-repos", process.cwd());
+    // 14.5: Reference Cataloger (self-contained fixture: docs/cloned-repos is gitignored, absent in CI)
+    const refAppDir = path.join(TEST_DIR, "reference-app");
+    for (const repo of ["repo-a", "repo-b"]) {
+      const repoDir = path.join(refAppDir, "docs", "cloned-repos", repo);
+      fs.mkdirSync(repoDir, { recursive: true });
+      fs.writeFileSync(path.join(repoDir, "README.md"), `# ${repo}\n\nFixture reference repository.\n`);
+    }
+    const refRes = catalogReferenceRepos("docs/cloned-repos", refAppDir);
     assert(refRes.reposCataloged === 2, "Reference cataloger indexed reference repositories");
-    assert(fs.existsSync(path.join(process.cwd(), "docs", "reference-atlas", "00_REFERENCE_PATTERNS.md")), "Generated 00_REFERENCE_PATTERNS.md");
+    assert(fs.existsSync(path.join(refAppDir, "docs", "reference-atlas", "00_REFERENCE_PATTERNS.md")), "Generated 00_REFERENCE_PATTERNS.md");
 
     console.log(`\n============================================================`);
     console.log(`🎉 Test Matrix Complete: ${passedTests}/${totalTests} Passed (100% Success)`);
