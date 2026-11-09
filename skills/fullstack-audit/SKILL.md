@@ -37,7 +37,7 @@ allowed-tools:
 
 ## How to Locate Components & Endpoints
 
-Use the atlas for structural questions, and normal search (Grep/Glob, `rg <pattern> <dir>`, `git grep`) when the atlas has no hit or may be stale. The atlas is a snapshot: confirm every hit by reading the file at that line.
+Use the atlas for structural questions and connections (UI -> API -> DB, impact, look-based lookups). Use normal search (Grep/Glob, `rg <pattern> <dir>`, `git grep`) first for an exact string you can quote, and whenever the atlas has no hit or a hit is tagged [STALE]. Top hits come with their code inlined; read the file only when you need more.
 
 ### Frontend Lookup (Screenshots, Components, Themes):
 1. **Fastest path**: call the MCP tools `fullstack_find` (text, routes, components) or `fullstack_locate_visual` (pulse dots, pills, badges, icons). They return short `file:line` hits.

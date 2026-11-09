@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { stampFiles, staleFiles, annotateStale } from "../scripts/freshness.ts";
+import { stampFiles, staleFiles, annotateStale, addSnippets } from "../scripts/freshness.ts";
 
 function fixture() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "fresh-"));
@@ -62,5 +62,23 @@ test("annotateStale is a no-op without stamps (old index) or when nothing change
     const text = "src/a.ts:1 [COMPONENT] A (ref)";
     assert.equal(annotateStale(root, undefined, text), text);
     assert.equal(annotateStale(root, stampFiles(root, ["src/a.ts"]), text), text);
+  } finally { fs.rmSync(root, { recursive: true, force: true }); }
+});
+
+test("addSnippets inlines code under the first fresh hits, skips stale and outside-root ones", () => {
+  const root = fixture();
+  try {
+    fs.writeFileSync(path.join(root, "src", "c.tsx"), "// head\nexport function Card() {\n  return <div>Hi</div>;\n}\n");
+    const text = [
+      "src/c.tsx:2 [COMPONENT] Card (ref)",
+      "src/a.ts:1 [COMPONENT] A (ref) [STALE: file edited since audit, line may have drifted]",
+      "../outside.ts:1 [COMPONENT] X (ref)",
+    ].join("\n");
+    const out = addSnippets(root, text).split("\n");
+    assert.equal(out[1], "    | 2: export function Card() {");
+    assert.equal(out[3], "    | 4: }");
+    assert.match(out[4], /\[STALE/);
+    assert.equal(out[5], "../outside.ts:1 [COMPONENT] X (ref)");
+    assert.equal(out.length, 6);
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
 });

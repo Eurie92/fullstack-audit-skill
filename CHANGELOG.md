@@ -9,6 +9,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ## [Unreleased]
 
 ### Added
+* **Inline snippets:** `fullstack_find`, `fullstack_locate_visual` and `fullstack_path` print the code at the first 3 fresh hits (`    | 12: <code>`), so the agent can often skip a Read. Stale hits get none.
+* **Grep fallback hint:** every `ZERO_MATCH` names what the atlas indexes and gives the `rg -n -F` command; the stale footer points to Grep/rg too. Rule text: grep first for an exact string, atlas for connections.
 * **Unfinished-work gate** (`scripts/check.ts`): checks only the change set (`git diff HEAD` + untracked, `--staged`, or `--files`) for `DEAD_HANDLER` (on* handler or a call in it points at a name not defined or imported), `STUB_HANDLER` (empty body = BLOCK, log/alert-only = WARN), `ORPHAN_COMPONENT` (new `.tsx/.jsx` component nothing imports) and `UNGUARDED_MUTATION` (DB-writing server action or mutating API route with no auth call; runs only when an auth library is a dependency, WARN when `middleware.ts`/`proxy.ts` exists). `// fullstack-check-ignore` silences a line.
 * Same engine, four entry points: MCP tool `fullstack_check`; CLI `--check [--staged] [--files] [--json]` (exit 1 only on BLOCK); Claude Code `Stop` hook `bin/check-hook.js` (files the agent edited this session, recorded by `refresh-hook.js`; exit 2 on BLOCK, honours `stop_hook_active`, opt out `FULLSTACK_AUDIT_NO_CHECK=1`); `--install-precommit` for any harness.
 * `ServerAction` now carries `hasAuth` and `writesDb` (`scripts/audit-backend.ts`).
