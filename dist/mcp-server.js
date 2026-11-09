@@ -26,7 +26,7 @@ import { applyUnifiedDiff, batchReplaceTokens } from "./precision-patcher.js";
 import { isInsideRoot } from "../bin/path-contained.js";
 import { runAdaptiveAudit } from "./adaptive-sniffer.js";
 import { catalogReferenceRepos } from "./reference-cataloger.js";
-import { annotateStale } from "./freshness.js";
+import { annotateStale, addSnippets } from "./freshness.js";
 import { findNodes, dependentsOf, shortestPath, neighborFiles, proximityBoost } from "./graph.js";
 // Ensure all diagnostic logging goes strictly to stderr. stdout is exclusively for JSON-RPC 2.0.
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -171,19 +171,22 @@ function getFilesRecursively(dir, fileList, maxFiles = 3000) {
 }
 // Load the index first (a reload clears the result caches), run the lookup, then flag hits whose
 // file changed since the atlas was built. Applied after the cache so cached answers are checked too.
-function withFreshness(projectRoot, run) {
+/** Appended to every ZERO_MATCH: the atlas only knows structure, so plain text needs a live search. */
+const grepHint = (q) => ` The atlas indexes routes, components, labels, API routes and DB models only; for other text search the code: rg -n -F ${JSON.stringify(q)}`;
+function withFreshness(projectRoot, run, snippets = false) {
     const root = resolveProjectRoot(projectRoot);
     const idx = getCachedAtlasIndex(path.join(root, "docs", "frontend-atlas", ".atlas-index.json"));
     const r = run();
     if (r.isError || !idx)
         return r;
-    return { ...r, content: annotateStale(root, idx.data.fileStamps, r.content) };
+    const content = annotateStale(root, idx.data.fileStamps, r.content);
+    return { ...r, content: snippets ? addSnippets(root, content) : content };
 }
 export function toolFind(query, projectRoot, compact = true, activeFile) {
-    return withFreshness(projectRoot, () => findImpl(query, projectRoot, compact, activeFile));
+    return withFreshness(projectRoot, () => findImpl(query, projectRoot, compact, activeFile), true);
 }
 export function toolLocateVisual(query, projectRoot) {
-    return withFreshness(projectRoot, () => locateVisualImpl(query, projectRoot));
+    return withFreshness(projectRoot, () => locateVisualImpl(query, projectRoot), true);
 }
 // 1. Tool: fullstack_find
 function findImpl(query, projectRoot, compact = true, activeFile) {
@@ -263,7 +266,7 @@ function findImpl(query, projectRoot, compact = true, activeFile) {
         }
         hits.sort((a, b) => b.score - a.score);
         if (hits.length === 0) {
-            const emptyResult = `ZERO_MATCH: "${query}" in .atlas-index.json.`;
+            const emptyResult = `ZERO_MATCH: "${query}" in .atlas-index.json.${grepHint(query)}`;
             findLruCache.set(cacheKey, emptyResult);
             return { content: emptyResult, isError: false };
         }
@@ -430,7 +433,7 @@ export function toolImpact(symbol, projectRoot, depth = 3) {
             const sym = (e) => (e.symbol || "").toLowerCase();
             const hits = entries.filter(e => sym(e) === q).concat(entries.filter(e => sym(e) !== q && sym(e).includes(q))).slice(0, 15);
             if (!hits.length)
-                return { content: `ZERO_MATCH: "${symbol}" has no graph node or atlas entry.`, isError: false };
+                return { content: `ZERO_MATCH: "${symbol}" has no graph node or atlas entry.${grepHint(symbol)}`, isError: false };
             return { content: `Graph had no edges for "${symbol}"; file-level matches only:\n${hits.map(entryLoc).join("\n")}`, isError: false };
         }
         const { items, truncated } = dependentsOf(g, start.id, maxDepth, 60);
@@ -481,7 +484,7 @@ export function toolComponent(name, projectRoot) {
         }
         const hits = pick(comps, c => c.name);
         if (!hits.length)
-            return { content: `ZERO_MATCH: no component "${name}" in the atlas.`, isError: false };
+            return { content: `ZERO_MATCH: no component "${name}" in the atlas.${grepHint(name)}`, isError: false };
         const out = hits.map(c => {
             const lines = [`${c.file}:${c.line} [EXISTS] ${c.name}`];
             lines.push(`  props: ${c.props.length ? c.props.map(p => `${p.name}${p.optional ? "?" : ""}${p.type ? `: ${p.type}` : ""}`).join(", ") : "(none)"}`);
@@ -495,7 +498,7 @@ export function toolComponent(name, projectRoot) {
 }
 // 4. Tool: fullstack_path
 export function toolCausalPath(from, to, projectRoot) {
-    return withFreshness(projectRoot, () => causalPathImpl(from, to, projectRoot));
+    return withFreshness(projectRoot, () => causalPathImpl(from, to, projectRoot), true);
 }
 function causalPathImpl(from, to, projectRoot) {
     const root = resolveProjectRoot(projectRoot);
@@ -868,7 +871,7 @@ function toolAudit(projectRoot, frontendOnly, backendOnly) {
 const TOOL_DEFINITIONS = [
     {
         name: "fullstack_find",
-        description: "Look up routes, components, symbols, visible UI labels, React Query keys, API routes and DB models in the pre-built atlas. Returns short file:line hits. Use it first for 'where is X' questions in a web app. The atlas is a snapshot: confirm a hit by reading the file, and use normal text search (Grep/rg) when it returns nothing.",
+        description: "Look up routes, components, symbols, visible UI labels, React Query keys, API routes and DB models in the pre-built atlas. Returns file:line hits with the code at the top hits inlined, so you often need no Read. For an exact, unique string (a label or name you can quote), Grep/rg is just as good; the atlas pays off for structure and connections (fullstack_path, fullstack_impact). Hits tagged [STALE] or a ZERO_MATCH mean: search the live code with Grep/rg.",
         inputSchema: {
             type: "object",
             properties: {

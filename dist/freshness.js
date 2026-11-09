@@ -67,6 +67,45 @@ export function annotateStale(root, stamps, text) {
         const m = HIT_LINE.exec(l);
         return m && stale.has(m[1].replace(/\\/g, "/")) ? `${l} [STALE: file edited since audit, line may have drifted]` : l;
     });
-    tagged.push(`(${stale.size} file(s) changed since the atlas was built. Re-run the audit to refresh.)`);
+    tagged.push(`(${stale.size} file(s) changed since the atlas was built. Re-run the audit to refresh, or use Grep/rg for the live code.)`);
     return tagged.join("\n");
+}
+const SNIPPET_HITS = 3;
+const SNIPPET_LINES = 3;
+const SNIPPET_COLS = 120;
+/**
+ * Inline the code at the first few fresh hits (`    | 12: <code>`) so the agent can often answer
+ * without a Read. Stale hits are skipped: their line may have drifted.
+ */
+export function addSnippets(root, text) {
+    const base = path.resolve(root);
+    const out = [];
+    let shown = 0;
+    for (const l of text.split("\n")) {
+        out.push(l);
+        if (shown >= SNIPPET_HITS || l.includes("[STALE"))
+            continue;
+        const m = HIT_LINE.exec(l);
+        if (!m)
+            continue;
+        const abs = path.resolve(base, m[1]);
+        if (abs !== base && !abs.startsWith(base + path.sep))
+            continue;
+        let src;
+        try {
+            if (fs.statSync(abs).size > 1_000_000)
+                continue;
+            src = fs.readFileSync(abs, "utf-8").split(/\r?\n/);
+        }
+        catch {
+            continue;
+        }
+        const start = Math.max(1, Number(m[2]));
+        const code = src.slice(start - 1, start - 1 + SNIPPET_LINES);
+        if (!code.some((c) => c.trim()))
+            continue;
+        code.forEach((c, i) => out.push(`    | ${start + i}: ${c.trimEnd().slice(0, SNIPPET_COLS)}`));
+        shown++;
+    }
+    return out.join("\n");
 }

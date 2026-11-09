@@ -18,8 +18,8 @@ This project has a pre-built code atlas in `docs/frontend-atlas/` and `docs/back
    - `fullstack_locate_visual`: elements described by look (pulse dots, capsule pills, badges, icons)
    - `fullstack_path`: UI element -> server action / API route -> DB model
    - `fullstack_resolve`: loosely written file or component names; `fullstack_symbol`: line ranges inside large files
-2. Confirm a hit by reading the file at that line. The atlas is a snapshot, so line numbers drift after edits.
-3. If the atlas has no hit or the code changed since the last audit, use normal search: your Grep/Glob tools, `rg <pattern> <dir>`, or `git grep`.
+2. Top hits come with their code inlined (`| 12: ...`); read the file only when you need more. The atlas is a snapshot: hits tagged [STALE] may have drifted.
+3. Use normal search (your Grep/Glob tools, `rg <pattern> <dir>`, `git grep`) first for an exact string you can quote, and whenever the atlas has no hit or a hit is [STALE]. The atlas pays off for connections: `fullstack_path`, impact, and look-based lookups.
 4. On Windows, do not run `Get-ChildItem -Recurse` or `dir /s` on the project root: it walks `node_modules/` and `.next/` and can freeze for many seconds. Scope it to a folder (`Get-ChildItem src -Recurse`) or use `rg`.
 5. Prefer the MCP tools over the `npx fullstack-audit` CLI; each CLI call starts the engine from scratch and takes seconds.
 6. Screenshots: look up visible text or icon names with `fullstack_find` / `fullstack_locate_visual`. If a screenshot under `AppData\Local\Temp` cannot be opened, copy it into the project's `scratch/` folder first.

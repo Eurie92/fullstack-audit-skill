@@ -54,7 +54,7 @@ test("impact respects depth cap", () => {
 test("impact on unknown symbol falls back to entries / zero match", () => {
   const root = project(chain);
   assert.match(toolImpact("Widget", root).content, /Graph had no edges for "Widget"[\s\S]*ui\/a\/Widget\.tsx:1/);
-  assert.match(toolImpact("NopeNothing", root).content, /^ZERO_MATCH/);
+  assert.match(toolImpact("NopeNothing", root).content, /^ZERO_MATCH[\s\S]*rg -n -F "NopeNothing"/);
 });
 
 test("path returns the multi-hop chain with link types", () => {
