@@ -15,7 +15,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 * Rule files and generated `AGENTS.md` gain a "Before saying done" step. Installers fetch `check.ts` and `dist/{check,audit-backend,safe-walk}.js`.
 * **Every harness gets the Stop gate**: `--install-hooks <claude|codex|gemini|cursor|windsurf>` writes the edit recorder + Stop gate into that harness's project config (merged, idempotent). `refresh-hook.js` normalizes stdin across harnesses (`hookContext`: Cursor `conversation_id`/`workspace_roots`/`file_path`, Codex `apply_patch` file headers); `check-hook.js` answers Cursor with `followup_message` and the rest with exit 2, and also honours Cursor `loop_count`.
 * `UNGUARDED_MUTATION` now sees raw SQL writes (`query`/`execute`/`sql` + `INSERT INTO`/`UPDATE … SET`/`DELETE FROM`) and custom guards like `requireAdmin*`/`verifyAdminSession`.
-* Bench: `build-ui` tasks t25-t28 graded by `check-clean` (feature present + gate finds 0 BLOCK); the `with` arm gets the same PostToolUse/Stop hooks; summary reports leftover BLOCK items per arm. Fixed lost `\s` in the t22-t24 edit patterns.
+* Bench: `build-ui` tasks t25-t28 graded by `check-clean` (feature present + gate finds 0 BLOCK); the `with` arm gets the same PostToolUse/Stop hooks; summary reports leftover BLOCK items per arm. Pilot (sonnet, 1 run per task, `bench/results/build-ui-pilot`): both arms 4/4 pass and 0 BLOCK left. The `with` agent called `fullstack_check` in all 4 runs. The tasks were too easy to show a gap, so a gap needs harder tasks or more runs. Fixed lost `\s` in the t22-t24 edit patterns.
 * Tests: `test/check.test.mjs` (11). Whole-repo run on the bench app (477 source files): 0 BLOCK, 1 WARN (a public, rate-limited POST that writes), 5.5 s.
 
 ---
