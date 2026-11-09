@@ -1,5 +1,5 @@
 {
-  "description": "Iron Gate: blocks unscoped recursive directory walks from Windows shells (they freeze under Windows Defender). Refresh: re-runs the audit in the background after the agent edits source files, so the atlas follows its edits.",
+  "description": "Iron Gate: blocks unscoped recursive directory walks from Windows shells (they freeze under Windows Defender). Refresh: re-runs the audit in the background after the agent edits source files, so the atlas follows its edits. Check: before the agent stops, flags unfinished work (dead or empty handlers, unimported new components, unguarded DB writes) in the files it edited.",
   "hooks": {
     "PreToolUse": [
       {
@@ -9,6 +9,17 @@
             "type": "command",
             "command": "node \"${CLAUDE_PLUGIN_ROOT}/bin/iron-gate-hook.js\"",
             "timeout": 5
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/bin/check-hook.js\"",
+            "timeout": 30
           }
         ]
       }

@@ -67,12 +67,12 @@ curl -fsSL "$BASE_URL/SKILL.md" -o "$TARGET_DIR/SKILL.md"
 curl -fsSL "$BASE_URL/scripts/audit.ts" -o "$TARGET_DIR/scripts/audit.ts"
 curl -fsSL "$BASE_URL/scripts/audit-backend.ts" -o "$TARGET_DIR/scripts/audit-backend.ts"
 curl -fsSL "$BASE_URL/scripts/constants.ts" -o "$TARGET_DIR/scripts/constants.ts"
-for f in precision-patcher.ts adaptive-sniffer.ts reference-cataloger.ts safe-walk.ts freshness.ts graph.ts; do curl -fsSL "$BASE_URL/scripts/$f" -o "$TARGET_DIR/scripts/$f"; done
+for f in precision-patcher.ts adaptive-sniffer.ts reference-cataloger.ts safe-walk.ts freshness.ts graph.ts check.ts; do curl -fsSL "$BASE_URL/scripts/$f" -o "$TARGET_DIR/scripts/$f"; done
 curl -fsSL "$BASE_URL/bin/audit.js" -o "$TARGET_DIR/bin/audit.js"
 curl -fsSL "$BASE_URL/bin/path-contained.js" -o "$TARGET_DIR/bin/path-contained.js"
 curl -fsSL "$BASE_URL/bin/mcp-server.js" -o "$TARGET_DIR/bin/mcp-server.js"
 mkdir -p "$TARGET_DIR/dist"
-for f in mcp-server constants precision-patcher adaptive-sniffer reference-cataloger freshness graph; do curl -fsSL "$BASE_URL/dist/$f.js" -o "$TARGET_DIR/dist/$f.js"; done
+for f in mcp-server constants precision-patcher adaptive-sniffer reference-cataloger freshness graph check audit-backend safe-walk; do curl -fsSL "$BASE_URL/dist/$f.js" -o "$TARGET_DIR/dist/$f.js"; done
 
 # Construct rule block (same text as generateDynamicRuleBlock in scripts/audit.ts)
 RULE_BLOCK="$(cat <<'RULE_EOF'
@@ -95,6 +95,9 @@ This project has a pre-built code atlas in `docs/frontend-atlas/` and `docs/back
 
 ### Keeping the atlas fresh
 - Run the `fullstack_audit` tool (or `/fullstack-audit`) after adding routes, pages, components or DB models, or when lookups look stale.
+
+### Before saying done
+- Call the `fullstack_check` tool (or `npx fullstack-audit --check`) on your changes and fix every BLOCK item (dead or empty handlers, new components nothing imports, DB writes without an auth check).
 
 ### Editing and verifying
 - Edit with your normal edit tool. `fullstack_patch` is available when shell quoting gets in the way (for example PowerShell and `&`).

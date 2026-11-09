@@ -258,7 +258,7 @@
   "check": {
    "type": "file-contains",
    "file": "components/public/storefront-trust-bar.tsx",
-   "pattern": "title:s*\"Exclusive Solo Access\""
+   "pattern": "title:\\s*\"Exclusive Solo Access\""
   }
  },
  {
@@ -268,7 +268,7 @@
   "check": {
    "type": "file-contains",
    "file": "components/public/storefront-trust-bar.tsx",
-   "pattern": "title:s*\"Instant Delivery\""
+   "pattern": "title:\\s*\"Instant Delivery\""
   }
  },
  {
@@ -278,7 +278,31 @@
   "check": {
    "type": "file-contains",
    "file": "components/public/storefront-buying-help.tsx",
-   "pattern": "question:s*\"How much time do I have to pay?\""
+   "pattern": "question:\\s*\"How much time do I have to pay?\""
   }
+ },
+ {
+  "id": "t25",
+  "category": "build-ui",
+  "prompt": "Admins can list and delete promotions through the API, but the admin dashboard has no screen for it. Add a Promotions panel to the admin dashboard that lists the promotions and lets an admin delete one.",
+  "check": { "type": "check-clean", "grep": "api/admin/promotions", "paths": ["app/admin", "components"] }
+ },
+ {
+  "id": "t26",
+  "category": "build-ui",
+  "prompt": "Create a reusable confirmation dialog component and use it so that deleting a store expense on the admin dashboard asks the admin to confirm first.",
+  "check": { "type": "check-clean", "grep": "Confirm", "paths": ["app/admin", "components"] }
+ },
+ {
+  "id": "t27",
+  "category": "build-ui",
+  "prompt": "Add an Export CSV button to the admin orders screen that downloads the currently loaded orders as a CSV file.",
+  "check": { "type": "check-clean", "grep": "text/csv|[.]csv", "paths": ["app/admin/orders", "components"] }
+ },
+ {
+  "id": "t28",
+  "category": "build-ui",
+  "prompt": "Add a way for an admin to archive a promotion instead of deleting it: a new API endpoint that marks the promotion as archived in the database, and an Archive button in the admin UI that calls it.",
+  "check": { "type": "check-clean", "grep": "archiv", "paths": ["app/api"] }
  }
 ]

@@ -6,6 +6,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [Unreleased]
+
+### Added
+* **Unfinished-work gate** (`scripts/check.ts`): checks only the change set (`git diff HEAD` + untracked, `--staged`, or `--files`) for `DEAD_HANDLER` (on* handler or a call in it points at a name not defined or imported), `STUB_HANDLER` (empty body = BLOCK, log/alert-only = WARN), `ORPHAN_COMPONENT` (new `.tsx/.jsx` component nothing imports) and `UNGUARDED_MUTATION` (DB-writing server action or mutating API route with no auth call; runs only when an auth library is a dependency, WARN when `middleware.ts`/`proxy.ts` exists). `// fullstack-check-ignore` silences a line.
+* Same engine, four entry points: MCP tool `fullstack_check`; CLI `--check [--staged] [--files] [--json]` (exit 1 only on BLOCK); Claude Code `Stop` hook `bin/check-hook.js` (files the agent edited this session, recorded by `refresh-hook.js`; exit 2 on BLOCK, honours `stop_hook_active`, opt out `FULLSTACK_AUDIT_NO_CHECK=1`); `--install-precommit` for any harness.
+* `ServerAction` now carries `hasAuth` and `writesDb` (`scripts/audit-backend.ts`).
+* Rule files and generated `AGENTS.md` gain a "Before saying done" step. Installers fetch `check.ts` and `dist/{check,audit-backend,safe-walk}.js`.
+* **Every harness gets the Stop gate**: `--install-hooks <claude|codex|gemini|cursor|windsurf>` writes the edit recorder + Stop gate into that harness's project config (merged, idempotent). `refresh-hook.js` normalizes stdin across harnesses (`hookContext`: Cursor `conversation_id`/`workspace_roots`/`file_path`, Codex `apply_patch` file headers); `check-hook.js` answers Cursor with `followup_message` and the rest with exit 2, and also honours Cursor `loop_count`.
+* `UNGUARDED_MUTATION` now sees raw SQL writes (`query`/`execute`/`sql` + `INSERT INTO`/`UPDATE … SET`/`DELETE FROM`) and custom guards like `requireAdmin*`/`verifyAdminSession`.
+* Bench: `build-ui` tasks t25-t28 graded by `check-clean` (feature present + gate finds 0 BLOCK); the `with` arm gets the same PostToolUse/Stop hooks; summary reports leftover BLOCK items per arm. Pilot (sonnet, 1 run per task, `bench/results/build-ui-pilot`): both arms 4/4 pass and 0 BLOCK left. The `with` agent called `fullstack_check` in all 4 runs. The tasks were too easy to show a gap, so a gap needs harder tasks or more runs. Fixed lost `\s` in the t22-t24 edit patterns.
+* Tests: `test/check.test.mjs` (11). Whole-repo run on the bench app (477 source files): 0 BLOCK, 1 WARN (a public, rate-limited POST that writes), 5.5 s.
+
+---
+
 ## [2.17.2] - 2026-11-09
 
 ### Fixed

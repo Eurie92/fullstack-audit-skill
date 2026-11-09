@@ -21,6 +21,77 @@ if (args.includes("-v") || args.includes("--version")) {
   process.exit(0);
 }
 
+// --check: unfinished-work gate on the change set (see scripts/check.ts). Exit 1 only on BLOCK.
+async function runCheckCli() {
+  try {
+    const mod = await import("../dist/check.js");
+    return mod.cli(args);
+  } catch (e) {
+    if (e?.code !== "ERR_MODULE_NOT_FOUND") { console.error(`fullstack-check: skipped (${e?.message || e})`); return 0; }
+  }
+  const tsx = path.resolve(__dirname, "../node_modules/tsx/dist/cli.mjs");
+  if (!fs.existsSync(tsx)) { console.error("fullstack-check: skipped (dist/check.js missing; run npm run build)"); return 0; }
+  const r = spawnSync(process.execPath, [tsx, path.resolve(__dirname, "../scripts/check.ts"), ...args], { stdio: "inherit", shell: false });
+  return r.status === 1 ? 1 : 0;
+}
+
+// --install-precommit: add the check to .git/hooks/pre-commit (skips when hooks are managed elsewhere).
+function installPrecommit() {
+  const bin = path.resolve(__dirname, "audit.js").replace(/\\/g, "/");
+  // Missing bin (plugin moved/removed) must not block commits: only exit 1 on a real BLOCK.
+  const line = `if [ -f "${bin}" ]; then node "${bin}" --check --staged || exit 1; fi`;
+  const g = (a) => spawnSync("git", a, { encoding: "utf-8", shell: false });
+  const custom = (g(["config", "core.hooksPath"]).stdout || "").trim();
+  const dirOut = g(["rev-parse", "--git-path", "hooks"]);
+  if (dirOut.status !== 0) { console.error("Not a git repository."); return 1; }
+  if (custom) {
+    console.log(`core.hooksPath is set to ${custom} (husky or similar). Add this line to your pre-commit hook:\n  ${line}`);
+    return 0;
+  }
+  const hook = path.resolve(dirOut.stdout.trim(), "pre-commit");
+  const cur = fs.existsSync(hook) ? fs.readFileSync(hook, "utf-8") : "";
+  if (cur.includes("--check --staged")) { console.log(`Already installed: ${hook}`); return 0; }
+  fs.mkdirSync(path.dirname(hook), { recursive: true });
+  fs.writeFileSync(hook, (cur || "#!/bin/sh\n").replace(/\n?$/, "\n") + line + "\n", { mode: 0o755 });
+  console.log(`Installed fullstack-check in ${hook}`);
+  return 0;
+}
+
+// --install-hooks <harness>: wire the edit recorder + unfinished-work Stop gate into another agent's
+// project config. Claude Code gets them from the plugin; this covers the rest (and Claude without it).
+function installHooks(harness) {
+  const cmd = (f) => `node "${path.resolve(__dirname, f).replace(/\\/g, "/")}"`;
+  const group = (f, matcher, timeout = 30) => ({ ...(matcher ? { matcher } : {}), hooks: [{ type: "command", command: cmd(f), timeout }] });
+  const edit = "refresh-hook.js", stop = "check-hook.js";
+  const targets = {
+    claude: [".claude/settings.json", () => ({ PostToolUse: [group(edit, "Edit|Write|MultiEdit")], Stop: [group(stop)] }), "hooks"],
+    codex: [".codex/hooks.json", () => ({ PostToolUse: [group(edit, "Edit|Write")], Stop: [group(stop)] }), "hooks"],
+    gemini: [".gemini/settings.json", () => ({ AfterTool: [group(edit, "write_file|replace", 30000)], AfterAgent: [group(stop, null, 30000)] }), "hooks"],
+    windsurf: [".devin/hooks.v1.json", () => ({ PostToolUse: [group(edit)], Stop: [group(stop)] }), null],
+    cursor: [".cursor/hooks.json", () => ({ afterFileEdit: [{ command: cmd(edit), timeout: 30 }], stop: [{ command: cmd(stop), timeout: 30, loop_limit: 1 }] }), "hooks"],
+  };
+  const t = targets[harness];
+  if (!t) { console.error(`Usage: --install-hooks <${Object.keys(targets).join("|")}>`); return 1; }
+  const [rel, build, key] = t;
+  const file = path.resolve(rel);
+  let cfg = {};
+  try { cfg = JSON.parse(fs.readFileSync(file, "utf-8")); } catch (e) { if (fs.existsSync(file)) { console.error(`Cannot parse ${rel}: ${e.message}`); return 1; } }
+  if (harness === "cursor") cfg.version ??= 1;
+  const hooks = key ? (cfg[key] ??= {}) : cfg;
+  for (const [event, entries] of Object.entries(build())) {
+    const list = (hooks[event] ??= []);
+    for (const e of entries) if (!JSON.stringify(list).includes(JSON.stringify(e.command ?? e.hooks[0].command).slice(1, -1))) list.push(e);
+  }
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, JSON.stringify(cfg, null, 2) + "\n");
+  console.log(`Installed fullstack-audit hooks in ${rel}. The Stop gate runs once an atlas exists (npx fullstack-audit).`);
+  return 0;
+}
+
+if (args.includes("--install-precommit")) process.exit(installPrecommit());
+if (args.includes("--install-hooks")) process.exit(installHooks(args[args.indexOf("--install-hooks") + 1]));
+if (args.includes("--check")) process.exit(await runCheckCli());
+
 // Fast path: atlas lookups served from the compiled MCP tools (no tsx cold start).
 function argAfter(...flags) {
   for (const f of flags) {

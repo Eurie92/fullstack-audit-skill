@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * PostToolUse hook (Edit|Write|MultiEdit): keep the atlas in step with the agent's own edits.
+ * PostToolUse hook (Edit|Write|MultiEdit; Cursor afterFileEdit, Gemini AfterTool, Codex apply_patch): keep the atlas in step with the agent's own edits.
  * The hook returns at once and spawns a detached worker that waits for edits to settle, then runs
  * the normal full audit (about 3 s on a mid-size project). Only runs where an atlas already exists,
  * so it never creates docs/ in a project that did not ask for one. Opt out: FULLSTACK_AUDIT_NO_REFRESH=1.
@@ -10,6 +10,7 @@
  */
 
 import fs from "fs";
+import os from "os";
 import path from "path";
 import { spawn } from "child_process";
 import { fileURLToPath } from "url";
@@ -28,6 +29,29 @@ export function shouldRefresh(filePath, root) {
   if (!SOURCE_EXT.test(rel)) return false;
   if (rel.split(path.sep).slice(0, -1).some((d) => SKIP_DIRS.has(d))) return false;
   return fs.existsSync(path.join(root, "docs", "frontend-atlas", ".atlas-index.json"));
+}
+
+/** Per-session list of files the agent edited; the Stop hook (check-hook.js) checks exactly these. */
+export function sessionEditsFile(sessionId) {
+  return path.join(os.tmpdir(), `fullstack-audit-edits-${String(sessionId).replace(/[^\w-]/g, "_")}.txt`);
+}
+
+/**
+ * Normalize hook stdin across harnesses: Claude Code / Codex / Gemini CLI / Devin (session_id, cwd,
+ * tool_input.file_path|path, Codex apply_patch text) and Cursor (conversation_id, workspace_roots,
+ * top-level file_path).
+ */
+export function hookContext(payload = {}) {
+  const sessionId = payload.session_id || payload.conversation_id || null;
+  const root = payload.cwd || payload.workspace_roots?.[0] || process.env.DEVIN_PROJECT_DIR || process.cwd();
+  const files = [payload.file_path, payload.tool_input?.file_path, payload.tool_input?.path].filter((f) => typeof f === "string");
+  for (const m of JSON.stringify(payload.tool_input || "").matchAll(/\*\*\* (?:Add|Update) File: ([^\\"]+?)(?:\\n|")/g)) files.push(m[1].trim());
+  return { sessionId, root, files: [...new Set(files)] };
+}
+
+function recordEdit(sessionId, filePath, root) {
+  if (!sessionId || !filePath) return;
+  try { fs.appendFileSync(sessionEditsFile(sessionId), path.resolve(root, filePath) + "\n"); } catch { /* best effort */ }
 }
 
 function atlasDir(root) {
@@ -80,9 +104,9 @@ function main() {
   try { raw = fs.readFileSync(0, "utf-8"); } catch { /* no stdin */ }
   let payload = {};
   try { payload = JSON.parse(raw || "{}"); } catch { /* ignore */ }
-  const root = payload.cwd || process.cwd();
-  const filePath = payload.tool_input?.file_path || payload.tool_input?.path;
-  if (!shouldRefresh(filePath, root)) process.exit(0);
+  const { sessionId, root, files } = hookContext(payload);
+  for (const f of files) recordEdit(sessionId, f, root);
+  if (!files.some((f) => shouldRefresh(f, root))) process.exit(0);
   const child = spawn(process.execPath, [fileURLToPath(import.meta.url), "--worker", root], {
     detached: true, stdio: "ignore", windowsHide: true,
   });

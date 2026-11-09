@@ -85,6 +85,7 @@ Use the atlas for structural questions, and normal search (Grep/Glob, `rg <patte
   - `fullstack_symbol`: Line-bound surgical slicer for functions/methods in God-files (>500 lines).
   - `fullstack_patch`: CRLF-agnostic surgical patcher (immune to PowerShell `&` syntax crashes).
   - `fullstack_audit`: Runs or refreshes the fullstack atlas catalog in the active project.
+  - `fullstack_check`: Run before saying a task is done. Flags unfinished work in changed files (dead or empty handlers, unimported new components, DB writes without auth). Fix every BLOCK.
 - **CLI Commands (Terminal & Scripts)**:
   - `/fullstack-audit` or `npm run audit`: Regenerates the entire Fullstack Atlas and root `llms.txt` / `llms-full.txt`.
   - `npx fullstack-audit --find "<query>" --compact`: Fast-path index query for AI agents (<1ms).

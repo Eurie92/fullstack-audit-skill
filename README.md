@@ -147,6 +147,22 @@ Once installed, **you do not need to run manual terminal commands during daily w
 | **`fullstack_batch_replace`** | Token, color, and string replacer across many files (supports dry run). | *"Swap brand hex `#4f46e5` to `#06b6d4` across all components"* |
 | **`fullstack_reference`** | Pattern lookup across reference repos you cloned into `docs/cloned-repos/`. | *"Look up reference patterns for subtitle parsing"* |
 | **`fullstack_audit`** | Rebuilds the atlas in `docs/` (frontend, backend, adaptive). Writes files. | Updates architecture maps after adding new routes, schema tables, or extensions |
+| **`fullstack_check`** | Unfinished-work gate on changed files: dead or empty `on*` handlers, new components nothing imports, DB writes without an auth check. `BLOCK` / `WARN`. | Called by the agent before it says "done" |
+
+### Unfinished-work gate (`fullstack_check`)
+
+Agents often stop with UI half-wired: a button whose handler is empty or points at nothing, a new component nobody renders, a server action that writes to the DB without checking the user. `fullstack_check` looks only at the change set (`git diff HEAD` + new files, `--staged`, or a file list) and reports `BLOCK` items to fix and `WARN` items to review. One engine, four ways in, so it works in every harness:
+
+| Way in | Harnesses | How |
+|---|---|---|
+| Rule file | all | `AGENTS.md` / skill text: "call `fullstack_check` before saying done" |
+| MCP tool | every MCP harness | `fullstack_check` |
+| Stop hook | Claude Code (plugin); Codex, Gemini CLI, Cursor, Windsurf/Devin via `npx fullstack-audit --install-hooks <codex|gemini|cursor|windsurf|claude>` | `bin/refresh-hook.js` records the files the agent edits; `bin/check-hook.js` checks them when the agent stops. On `BLOCK` it sends the report back (exit 2 + stderr; Cursor: `followup_message`) so the agent keeps working: one forced pass, then the turn ends. Opt out: `FULLSTACK_AUDIT_NO_CHECK=1` |
+| Git pre-commit | any harness, and people | `npx fullstack-audit --install-precommit` adds `--check --staged` to `.git/hooks/pre-commit` |
+
+CLI: `npx fullstack-audit --check [--staged] [--files a.tsx,b.ts] [--json]` exits 1 only on `BLOCK`; tool errors never block. Hook configs written by `--install-hooks`: `.codex/hooks.json` (PostToolUse + Stop), `.gemini/settings.json` (AfterTool + AfterAgent), `.cursor/hooks.json` (afterFileEdit + stop, `loop_limit: 1`), `.devin/hooks.v1.json` (PostToolUse + Stop), `.claude/settings.json`. Existing keys are kept and re-running is a no-op. Silence an intentional case with a `// fullstack-check-ignore: <reason>` comment on the line or the line above.
+
+v1 coverage: React `.tsx/.jsx/.js` handlers; Next.js server actions and App/Pages Router API routes, Express routes (WARN only); DB writes via Prisma, Drizzle, the Supabase query builder and raw SQL (`query`/`execute`/`sql` with `INSERT`/`UPDATE`/`DELETE`). Custom guards named `require*/verify*/assert*/ensure*/check*` + `Session/Auth/User/Admin/Role/Login` count as auth. Vue/Svelte handlers are not covered yet. The auth rule runs only when `package.json` lists an auth library, and drops to WARN when `middleware.ts` / `proxy.ts` exists.
 
 > In v2.17.1 the shipped MCP server (`bin/mcp-server.js`) still exposes the first 7 tools; `fullstack_patch_apply`, `fullstack_batch_replace` and `fullstack_reference` are in `scripts/mcp-server.ts` and ship once the build step lands (see the roadmap).
 

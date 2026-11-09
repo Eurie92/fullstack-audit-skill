@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Universal Fullstack Audit MCP Server (Stdio JSON-RPC 2.0 Daemon)
- * Exposes 12 high-performance native tools to AI agents:
+ * Exposes 13 native tools to AI agents:
  * 1. fullstack_find: compact lookup across Fullstack Atlas
  * 2. fullstack_locate_visual: visual locator (pulse dots, capsule pills, action icons, badges)
  * 3. fullstack_resolve: Fuzzy prefix-agnostic component and file resolver
@@ -14,6 +14,7 @@
  * 10. fullstack_audit: On-demand atlas regeneration (frontend, backend, and adaptive)
  * 11. fullstack_impact: blast radius (reverse dependency walk over the causal graph)
  * 12. fullstack_component: component props, cva variants and usage count (duplicate check before building)
+ * 13. fullstack_check: unfinished-work gate on changed files (dead/empty handlers, orphan components, unguarded DB writes)
  */
 
 import fs from "fs";
@@ -1053,6 +1054,18 @@ const TOOL_DEFINITIONS = [
     }
   },
   {
+    name: "fullstack_check",
+    description: "Run this BEFORE you say a UI or backend task is done. Checks the changed files (git diff + new files, or the list you pass) for unfinished work: on* handlers that point at undefined functions or have empty bodies, new components that nothing imports, DB-writing server actions / API routes with no auth check. BLOCK = fix before finishing; WARN = review. Not a search tool.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        files: { type: "array", items: { type: "string" }, description: "Optional files to check (project-relative or absolute). Default: every changed source file in the working tree." },
+        staged: { type: "boolean", description: "Check only staged files (pre-commit view)." },
+        projectRoot: { type: "string", description: "Optional project root directory path. Defaults to active workspace." }
+      }
+    }
+  },
+  {
     name: "fullstack_audit",
     description: "Rebuild the atlas from the current code into docs/frontend-atlas/, docs/backend-atlas/ and docs/adaptive-atlas/, and add those folders to an existing .gitignore. Writes files. Use it after adding routes, pages or models, or when lookups look stale.",
     inputSchema: {
@@ -1182,6 +1195,15 @@ export function startMcpServer() {
           case "fullstack_audit":
             result = toolAudit(args.projectRoot, args.frontendOnly, args.backendOnly);
             break;
+          case "fullstack_check":
+            // Lazy import: keeps the TypeScript parser out of server start-up and CLI fast paths.
+            import("./check.js")
+              .then(m => {
+                const r = m.runCheck(path.resolve(args.projectRoot || process.cwd()), { files: args.files, staged: args.staged });
+                sendResponse(id, { content: [{ type: "text", text: m.formatReport(r) }], isError: false });
+              })
+              .catch((err: any) => sendResponse(id, { content: [{ type: "text", text: `fullstack-check failed: ${err?.message || err}` }], isError: true }));
+            return;
           default:
             sendError(id, -32601, `Tool not found: ${toolName}`);
             return;
