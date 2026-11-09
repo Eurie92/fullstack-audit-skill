@@ -13,7 +13,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 * Same engine, four entry points: MCP tool `fullstack_check`; CLI `--check [--staged] [--files] [--json]` (exit 1 only on BLOCK); Claude Code `Stop` hook `bin/check-hook.js` (files the agent edited this session, recorded by `refresh-hook.js`; exit 2 on BLOCK, honours `stop_hook_active`, opt out `FULLSTACK_AUDIT_NO_CHECK=1`); `--install-precommit` for any harness.
 * `ServerAction` now carries `hasAuth` and `writesDb` (`scripts/audit-backend.ts`).
 * Rule files and generated `AGENTS.md` gain a "Before saying done" step. Installers fetch `check.ts` and `dist/{check,audit-backend,safe-walk}.js`.
-* Tests: `test/check.test.mjs` (8). Whole-repo run on the bench app (751 files): 0 findings, 5.5 s.
+* **Every harness gets the Stop gate**: `--install-hooks <claude|codex|gemini|cursor|windsurf>` writes the edit recorder + Stop gate into that harness's project config (merged, idempotent). `refresh-hook.js` normalizes stdin across harnesses (`hookContext`: Cursor `conversation_id`/`workspace_roots`/`file_path`, Codex `apply_patch` file headers); `check-hook.js` answers Cursor with `followup_message` and the rest with exit 2, and also honours Cursor `loop_count`.
+* `UNGUARDED_MUTATION` now sees raw SQL writes (`query`/`execute`/`sql` + `INSERT INTO`/`UPDATE … SET`/`DELETE FROM`) and custom guards like `requireAdmin*`/`verifyAdminSession`.
+* Bench: `build-ui` tasks t25-t28 graded by `check-clean` (feature present + gate finds 0 BLOCK); the `with` arm gets the same PostToolUse/Stop hooks; summary reports leftover BLOCK items per arm. Fixed lost `\s` in the t22-t24 edit patterns.
+* Tests: `test/check.test.mjs` (11). Whole-repo run on the bench app (477 source files): 0 BLOCK, 1 WARN (a public, rate-limited POST that writes), 5.5 s.
 
 ---
 

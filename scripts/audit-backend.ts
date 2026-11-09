@@ -609,9 +609,9 @@ export function parseDatabaseModels(files: string[], rootDir: string = ROOT_DIR)
 
 // 3. Static Server Actions Parser ("use server")
 /** Calls that check who the caller is (NextAuth, Clerk, Supabase, Lucia, Kinde, custom helpers). */
-export const AUTH_CALL_RE = /\b(?:auth|getServerSession|getSession|currentUser|getUser|requireUser|requireAuth|verifyToken|authenticate|withAuth|getAuth|validateRequest|getKindeServerSession)\b/;
-/** DB writes: Prisma, Drizzle, Supabase query builder. */
-export const DB_WRITE_RE = /prisma\.\w+\.(?:create|createMany|update|updateMany|upsert|delete|deleteMany)\b|\bdb\.(?:insert|update|delete)\b|\.from\([^)]*\)\s*\.(?:insert|update|upsert|delete)\b/;
+export const AUTH_CALL_RE = /\b(?:auth|getServerSession|getSession|currentUser|getUser|requireUser|requireAuth|verifyToken|authenticate|withAuth|getAuth|validateRequest|getKindeServerSession|(?:require|verify|assert|ensure|check)\w*(?:Session|Auth|User|Admin|Role|Login)\w*)\b/;
+/** DB writes: Prisma, Drizzle, Supabase query builder, raw SQL via query/execute/sql`` (pg, mysql2, postgres.js, Neon). */
+export const DB_WRITE_RE = /prisma\.\w+\.(?:create|createMany|update|updateMany|upsert|delete|deleteMany)\b|\bdb\.(?:insert|update|delete)\b|\.from\([^)]*\)\s*\.(?:insert|update|upsert|delete)\b|\b(?:query|execute|exec|sql|run)\s*(?:<[^>]*>)?\s*\(?\s*[`"']\s*(?:INSERT\s+INTO|UPDATE\s+[\w."`]+\s+SET|DELETE\s+FROM)\b/i;
 
 function hasUseServerDirective(body: ts.Node | undefined): boolean {
   if (!body || !ts.isBlock(body)) return false;

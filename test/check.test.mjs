@@ -129,6 +129,19 @@ test("unguarded mutation: App Router POST that writes, webhook route exempt", ()
   } finally { rm(root); }
 });
 
+test("unguarded mutation: raw SQL writes count; custom require*/verify* auth helpers count as guards", () => {
+  const authPkg = JSON.stringify({ dependencies: { "firebase-admin": "12.0.0" } });
+  const raw = (guard) => `import { query } from "@/db";\nexport async function DELETE(req: Request) {\n  ${guard}\n  await query(\`\n    DELETE FROM items WHERE id = $1\`, [1]);\n  return Response.json({});\n}\n`;
+  const root = repo({ "package.json": authPkg }, {
+    "src/app/api/items/route.ts": raw(""),
+    "src/app/api/admin/items/route.ts": raw("await requireAdminInvisibility(req);"),
+    "src/app/api/stats/route.ts": 'import { query } from "@/db";\nexport async function POST() {\n  return Response.json(await query("SELECT count(*) FROM items"));\n}\n',
+  });
+  try {
+    assert.deepEqual(rules(runCheck(root)), ["BLOCK UNGUARDED_MUTATION src/app/api/items/route.ts:1"]);
+  } finally { rm(root); }
+});
+
 test("staged mode only sees staged files; not a git repo returns a note", () => {
   const root = repo({ "src/A.tsx": "export const A = () => null;\n" }, { "src/A.tsx": "export const A = () => <b onClick={nope} />;\n" });
   try {
@@ -170,4 +183,45 @@ test("Stop hook: blocks with exit 2 on agent-edited files, respects stop_hook_ac
     fs.rmSync(sessionEditsFile(sid), { force: true });
     rm(root);
   }
+});
+
+test("other harnesses: Codex apply_patch edits are recorded; Cursor stop gets followup_message, loop_count guards", () => {
+  const root = repo({ "src/A.tsx": "export const A = () => null;\n" }, { "src/A.tsx": "export const A = () => <b onClick={missing} />;\n" });
+  fs.mkdirSync(path.join(root, "docs/frontend-atlas"), { recursive: true });
+  fs.writeFileSync(path.join(root, "docs/frontend-atlas/.atlas-index.json"), "{}");
+  const env = { ...process.env, FULLSTACK_AUDIT_NO_REFRESH: "1" };
+  const hook = (f, p) => spawnSync(process.execPath, [path.resolve("bin", f)], { input: JSON.stringify(p), encoding: "utf-8", env });
+  const codex = `codex-${process.pid}-${Date.now()}`, cursor = `cursor-${process.pid}-${Date.now()}`;
+  try {
+    hook("refresh-hook.js", { session_id: codex, cwd: root, tool_name: "apply_patch", tool_input: { command: "*** Begin Patch\n*** Update File: src/A.tsx\n@@\n*** End Patch" } });
+    const c = hook("check-hook.js", { session_id: codex, cwd: root, stop_hook_active: false });
+    assert.equal(c.status, 2, c.stderr);
+    hook("refresh-hook.js", { conversation_id: cursor, workspace_roots: [root], file_path: path.join(root, "src/A.tsx") });
+    const k = hook("check-hook.js", { conversation_id: cursor, workspace_roots: [root], status: "completed", loop_count: 0 });
+    assert.equal(k.status, 0);
+    assert.match(JSON.parse(k.stdout).followup_message, /DEAD_HANDLER/);
+    assert.equal(hook("check-hook.js", { conversation_id: cursor, workspace_roots: [root], loop_count: 1 }).stdout, "");
+  } finally {
+    for (const s of [codex, cursor]) fs.rmSync(sessionEditsFile(s), { force: true });
+    rm(root);
+  }
+});
+
+test("--install-hooks writes each harness config once (idempotent) and keeps existing keys", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "hooks-"));
+  const run = (h) => spawnSync(process.execPath, [BIN, "--install-hooks", h], { cwd: root, encoding: "utf-8" });
+  try {
+    fs.mkdirSync(path.join(root, ".gemini"));
+    fs.writeFileSync(path.join(root, ".gemini/settings.json"), JSON.stringify({ theme: "dark" }));
+    for (const h of ["claude", "codex", "gemini", "windsurf", "cursor"]) { assert.equal(run(h).status, 0); assert.equal(run(h).status, 0); }
+    const read = (f) => JSON.parse(fs.readFileSync(path.join(root, f), "utf-8"));
+    assert.equal(read(".gemini/settings.json").theme, "dark");
+    assert.equal(read(".gemini/settings.json").hooks.AfterAgent.length, 1);
+    assert.equal(read(".codex/hooks.json").hooks.Stop.length, 1);
+    assert.equal(read(".devin/hooks.v1.json").Stop.length, 1);
+    assert.equal(read(".cursor/hooks.json").version, 1);
+    assert.equal(read(".cursor/hooks.json").hooks.stop[0].loop_limit, 1);
+    assert.match(read(".claude/settings.json").hooks.Stop[0].hooks[0].command, /check-hook\.js"$/);
+    assert.equal(run("nope").status, 1);
+  } finally { rm(root); }
 });

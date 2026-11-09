@@ -157,12 +157,12 @@ Agents often stop with UI half-wired: a button whose handler is empty or points 
 |---|---|---|
 | Rule file | all | `AGENTS.md` / skill text: "call `fullstack_check` before saying done" |
 | MCP tool | every MCP harness | `fullstack_check` |
-| Stop hook | Claude Code (plugin) | `bin/check-hook.js` checks the files the agent edited this session; on `BLOCK` it exits 2 so the agent keeps working (one forced pass, then it lets the turn end). Opt out: `FULLSTACK_AUDIT_NO_CHECK=1` |
+| Stop hook | Claude Code (plugin); Codex, Gemini CLI, Cursor, Windsurf/Devin via `npx fullstack-audit --install-hooks <codex|gemini|cursor|windsurf|claude>` | `bin/refresh-hook.js` records the files the agent edits; `bin/check-hook.js` checks them when the agent stops. On `BLOCK` it sends the report back (exit 2 + stderr; Cursor: `followup_message`) so the agent keeps working: one forced pass, then the turn ends. Opt out: `FULLSTACK_AUDIT_NO_CHECK=1` |
 | Git pre-commit | any harness, and people | `npx fullstack-audit --install-precommit` adds `--check --staged` to `.git/hooks/pre-commit` |
 
-CLI: `npx fullstack-audit --check [--staged] [--files a.tsx,b.ts] [--json]` exits 1 only on `BLOCK`; tool errors never block. Silence an intentional case with a `// fullstack-check-ignore: <reason>` comment on the line or the line above.
+CLI: `npx fullstack-audit --check [--staged] [--files a.tsx,b.ts] [--json]` exits 1 only on `BLOCK`; tool errors never block. Hook configs written by `--install-hooks`: `.codex/hooks.json` (PostToolUse + Stop), `.gemini/settings.json` (AfterTool + AfterAgent), `.cursor/hooks.json` (afterFileEdit + stop, `loop_limit: 1`), `.devin/hooks.v1.json` (PostToolUse + Stop), `.claude/settings.json`. Existing keys are kept and re-running is a no-op. Silence an intentional case with a `// fullstack-check-ignore: <reason>` comment on the line or the line above.
 
-v1 coverage: React `.tsx/.jsx/.js` handlers; Next.js server actions and App/Pages Router API routes, Express routes (WARN only); DB writes via Prisma, Drizzle and the Supabase query builder. Raw SQL writes and Vue/Svelte handlers are not covered yet. The auth rule runs only when `package.json` lists an auth library, and drops to WARN when `middleware.ts` / `proxy.ts` exists.
+v1 coverage: React `.tsx/.jsx/.js` handlers; Next.js server actions and App/Pages Router API routes, Express routes (WARN only); DB writes via Prisma, Drizzle, the Supabase query builder and raw SQL (`query`/`execute`/`sql` with `INSERT`/`UPDATE`/`DELETE`). Custom guards named `require*/verify*/assert*/ensure*/check*` + `Session/Auth/User/Admin/Role/Login` count as auth. Vue/Svelte handlers are not covered yet. The auth rule runs only when `package.json` lists an auth library, and drops to WARN when `middleware.ts` / `proxy.ts` exists.
 
 > In v2.17.1 the shipped MCP server (`bin/mcp-server.js`) still exposes the first 7 tools; `fullstack_patch_apply`, `fullstack_batch_replace` and `fullstack_reference` are in `scripts/mcp-server.ts` and ship once the build step lands (see the roadmap).
 

@@ -39,7 +39,7 @@ const work = path.resolve(args.work || path.join(HERE, ".work"));
 let tasks = JSON.parse(fs.readFileSync(tasksFile, "utf-8"));
 if (args.only) { const s = new Set(String(args.only).split(",")); tasks = tasks.filter((t) => s.has(t.id)); }
 
-const HINT = `This project has a pre-built code atlas. Before grepping or globbing, call the fullstack_find MCP tool (and fullstack_path / fullstack_impact / fullstack_component for relationships) to locate symbols, routes, labels and dependencies. Fall back to normal search only if it returns nothing.`;
+const HINT = `This project has a pre-built code atlas. Before grepping or globbing, call the fullstack_find MCP tool (and fullstack_path / fullstack_impact / fullstack_component for relationships) to locate symbols, routes, labels and dependencies. Fall back to normal search only if it returns nothing. Before saying done on a change, call the fullstack_check MCP tool and fix every BLOCK item.`;
 
 const sh = (cmd, argv, opts = {}) => spawnSync(cmd, argv, { encoding: "utf-8", ...opts });
 
@@ -51,7 +51,7 @@ function prepareCheckout(dir) {
 }
 function resetCheckout(dir) {
   sh("git", ["-C", dir, "checkout", "--", "."]);
-  sh("git", ["-C", dir, "clean", "-fdq", "-e", "docs/frontend-atlas", "-e", "CLAUDE.md", "-e", ".mcp.bench.json"]);
+  sh("git", ["-C", dir, "clean", "-fdq", "-e", "docs/frontend-atlas", "-e", "CLAUDE.md", "-e", ".mcp.bench.json", "-e", ".claude"]);
 }
 
 function armSetup(arm, dir) {
@@ -65,6 +65,10 @@ function armSetup(arm, dir) {
   fs.writeFileSync(path.join(dir, "CLAUDE.md"), HINT + "\n");
   const mcp = path.join(dir, ".mcp.bench.json");
   fs.writeFileSync(mcp, JSON.stringify({ mcpServers: { "fullstack-audit": { command: process.execPath, args: [path.join(REPO, "bin", "mcp-server.js")], env: { FULLSTACK_AUDIT_ROOT: dir } } } }));
+  // Same hooks the plugin ships: record edits, then gate the Stop on unfinished work in them.
+  const hook = (f) => [{ hooks: [{ type: "command", command: `node "${path.join(REPO, "bin", f)}"`, timeout: 30 }] }];
+  fs.mkdirSync(path.join(dir, ".claude"), { recursive: true });
+  fs.writeFileSync(path.join(dir, ".claude", "settings.json"), JSON.stringify({ hooks: { PostToolUse: [{ matcher: "Edit|Write|MultiEdit", ...hook("refresh-hook.js")[0] }], Stop: hook("check-hook.js") } }, null, 2));
   return { extra: ["--mcp-config", mcp], atlasMs };
 }
 
@@ -102,8 +106,19 @@ function parseStream(raw) {
 }
 
 const norm = (s) => String(s).toLowerCase().replace(/\\/g, "/");
-function grade(task, answer, dir) {
+/** BLOCK items the unfinished-work gate finds in the checkout's uncommitted changes (null if it could not run). */
+function leftovers(dir) {
+  const r = sh(process.execPath, [path.join(REPO, "bin", "audit.js"), "--check"], { cwd: dir, timeout: 120000 });
+  const m = /(\d+) BLOCK/.exec(r.stdout || "");
+  return m ? Number(m[1]) : (r.status === 0 ? 0 : null);
+}
+function grade(task, answer, dir, left) {
   const c = task.check;
+  if (c.type === "check-clean") {
+    // Feature present (regex over tracked + new files) and the gate finds no BLOCK leftovers.
+    const g = sh("git", ["-C", dir, "grep", "-q", "-E", "--untracked", c.grep, "--", ...(c.paths || ["."])]);
+    return g.status === 0 && left === 0;
+  }
   if (c.type === "answer-contains") {
     const a = norm(answer);
     const all = (c.all || []).every((s) => a.includes(norm(s)));
@@ -141,11 +156,13 @@ for (const { t, r, arm } of plan) {
   const res = await runClaude(argv, co.dir, t.prompt);
   const { tools, result, init } = parseStream(res.so);
   const answer = result?.result || "";
+  const left = t.check.type === "check-clean" ? leftovers(co.dir) : null;
   const u = result?.usage || {};
   const tokens = (u.input_tokens || 0) + (u.output_tokens || 0) + (u.cache_creation_input_tokens || 0);
   const row = {
     arm, task: t.id, category: t.category, run: r,
-    pass: grade(t, answer, co.dir),
+    leftover_block: t.check.type === "check-clean" ? left : null,
+    pass: grade(t, answer, co.dir, left),
     tokens, cache_read: u.cache_read_input_tokens || 0,
     cost_usd: result?.total_cost_usd ?? null, turns: result?.num_turns ?? null,
     tool_calls: Object.values(tools).reduce((a, b) => a + b, 0), tools,
@@ -172,6 +189,15 @@ for (const scope of ["all", ...new Set(tasks.map((t) => t.category))]) {
   for (const arm of arms) {
     const l = rows.filter((x) => x.arm === arm && (scope === "all" || x.category === scope));
     md += `| ${arm} ${fmt(summarize(l))}\n`;
+  }
+  md += "\n";
+}
+const built = rows.filter((x) => x.leftover_block != null);
+if (built.length) {
+  md += `## unfinished work left behind (check-clean tasks)\n\n| arm | runs | runs with BLOCK leftovers | total BLOCK items |\n|---|---|---|---|\n`;
+  for (const arm of arms) {
+    const l = built.filter((x) => x.arm === arm);
+    md += `| ${arm} | ${l.length} | ${l.filter((x) => x.leftover_block > 0).length} | ${l.reduce((a, x) => a + (x.leftover_block || 0), 0)} |\n`;
   }
   md += "\n";
 }

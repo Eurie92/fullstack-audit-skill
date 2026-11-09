@@ -57,7 +57,39 @@ function installPrecommit() {
   return 0;
 }
 
+// --install-hooks <harness>: wire the edit recorder + unfinished-work Stop gate into another agent's
+// project config. Claude Code gets them from the plugin; this covers the rest (and Claude without it).
+function installHooks(harness) {
+  const cmd = (f) => `node "${path.resolve(__dirname, f).replace(/\\/g, "/")}"`;
+  const group = (f, matcher, timeout = 30) => ({ ...(matcher ? { matcher } : {}), hooks: [{ type: "command", command: cmd(f), timeout }] });
+  const edit = "refresh-hook.js", stop = "check-hook.js";
+  const targets = {
+    claude: [".claude/settings.json", () => ({ PostToolUse: [group(edit, "Edit|Write|MultiEdit")], Stop: [group(stop)] }), "hooks"],
+    codex: [".codex/hooks.json", () => ({ PostToolUse: [group(edit, "Edit|Write")], Stop: [group(stop)] }), "hooks"],
+    gemini: [".gemini/settings.json", () => ({ AfterTool: [group(edit, "write_file|replace", 30000)], AfterAgent: [group(stop, null, 30000)] }), "hooks"],
+    windsurf: [".devin/hooks.v1.json", () => ({ PostToolUse: [group(edit)], Stop: [group(stop)] }), null],
+    cursor: [".cursor/hooks.json", () => ({ afterFileEdit: [{ command: cmd(edit), timeout: 30 }], stop: [{ command: cmd(stop), timeout: 30, loop_limit: 1 }] }), "hooks"],
+  };
+  const t = targets[harness];
+  if (!t) { console.error(`Usage: --install-hooks <${Object.keys(targets).join("|")}>`); return 1; }
+  const [rel, build, key] = t;
+  const file = path.resolve(rel);
+  let cfg = {};
+  try { cfg = JSON.parse(fs.readFileSync(file, "utf-8")); } catch (e) { if (fs.existsSync(file)) { console.error(`Cannot parse ${rel}: ${e.message}`); return 1; } }
+  if (harness === "cursor") cfg.version ??= 1;
+  const hooks = key ? (cfg[key] ??= {}) : cfg;
+  for (const [event, entries] of Object.entries(build())) {
+    const list = (hooks[event] ??= []);
+    for (const e of entries) if (!JSON.stringify(list).includes(JSON.stringify(e.command ?? e.hooks[0].command).slice(1, -1))) list.push(e);
+  }
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, JSON.stringify(cfg, null, 2) + "\n");
+  console.log(`Installed fullstack-audit hooks in ${rel}. The Stop gate runs once an atlas exists (npx fullstack-audit).`);
+  return 0;
+}
+
 if (args.includes("--install-precommit")) process.exit(installPrecommit());
+if (args.includes("--install-hooks")) process.exit(installHooks(args[args.indexOf("--install-hooks") + 1]));
 if (args.includes("--check")) process.exit(await runCheckCli());
 
 // Fast path: atlas lookups served from the compiled MCP tools (no tsx cold start).
