@@ -70,6 +70,10 @@ export interface ServerAction {
   dbOperations: string[];
   externalServices: string[];
   snippet: string;
+  /** Function body calls a known auth/session helper. */
+  hasAuth?: boolean;
+  /** Function body writes to the DB (create/update/delete/upsert/insert). */
+  writesDb?: boolean;
 }
 
 export interface AuthGuard {
@@ -604,6 +608,11 @@ export function parseDatabaseModels(files: string[], rootDir: string = ROOT_DIR)
 }
 
 // 3. Static Server Actions Parser ("use server")
+/** Calls that check who the caller is (NextAuth, Clerk, Supabase, Lucia, Kinde, custom helpers). */
+export const AUTH_CALL_RE = /\b(?:auth|getServerSession|getSession|currentUser|getUser|requireUser|requireAuth|verifyToken|authenticate|withAuth|getAuth|validateRequest|getKindeServerSession)\b/;
+/** DB writes: Prisma, Drizzle, Supabase query builder. */
+export const DB_WRITE_RE = /prisma\.\w+\.(?:create|createMany|update|updateMany|upsert|delete|deleteMany)\b|\bdb\.(?:insert|update|delete)\b|\.from\([^)]*\)\s*\.(?:insert|update|upsert|delete)\b/;
+
 function hasUseServerDirective(body: ts.Node | undefined): boolean {
   if (!body || !ts.isBlock(body)) return false;
   for (const st of body.statements) {
@@ -650,6 +659,8 @@ export function parseServerActions(files: string[], rootDir: string = ROOT_DIR):
         dbOperations,
         externalServices,
         snippet: text.split("\n")[0].trim().slice(0, 60),
+        hasAuth: AUTH_CALL_RE.test(text),
+        writesDb: DB_WRITE_RE.test(text),
       });
     };
     const isAsync = (n: ts.Node) => !!(ts.canHaveModifiers(n) && ts.getModifiers(n)?.some(m => m.kind === ts.SyntaxKind.AsyncKeyword));

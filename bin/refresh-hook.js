@@ -10,6 +10,7 @@
  */
 
 import fs from "fs";
+import os from "os";
 import path from "path";
 import { spawn } from "child_process";
 import { fileURLToPath } from "url";
@@ -28,6 +29,16 @@ export function shouldRefresh(filePath, root) {
   if (!SOURCE_EXT.test(rel)) return false;
   if (rel.split(path.sep).slice(0, -1).some((d) => SKIP_DIRS.has(d))) return false;
   return fs.existsSync(path.join(root, "docs", "frontend-atlas", ".atlas-index.json"));
+}
+
+/** Per-session list of files the agent edited; the Stop hook (check-hook.js) checks exactly these. */
+export function sessionEditsFile(sessionId) {
+  return path.join(os.tmpdir(), `fullstack-audit-edits-${String(sessionId).replace(/[^\w-]/g, "_")}.txt`);
+}
+
+function recordEdit(sessionId, filePath, root) {
+  if (!sessionId || !filePath) return;
+  try { fs.appendFileSync(sessionEditsFile(sessionId), path.resolve(root, filePath) + "\n"); } catch { /* best effort */ }
 }
 
 function atlasDir(root) {
@@ -82,6 +93,7 @@ function main() {
   try { payload = JSON.parse(raw || "{}"); } catch { /* ignore */ }
   const root = payload.cwd || process.cwd();
   const filePath = payload.tool_input?.file_path || payload.tool_input?.path;
+  recordEdit(payload.session_id, filePath, root);
   if (!shouldRefresh(filePath, root)) process.exit(0);
   const child = spawn(process.execPath, [fileURLToPath(import.meta.url), "--worker", root], {
     detached: true, stdio: "ignore", windowsHide: true,

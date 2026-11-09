@@ -88,6 +88,7 @@ Use the atlas for structural questions, and normal search (Grep/Glob, `rg <patte
   - `fullstack_batch_replace`: 1-turn mass color and token replacer across multiple files with dry-run support.
   - `fullstack_reference`: Reference pattern cataloger for zero-hallucination mechanism retrieval.
   - `fullstack_audit`: Runs or refreshes the fullstack atlas catalog (frontend, backend, and adaptive).
+  - `fullstack_check`: Run before saying a task is done. Flags unfinished work in changed files (dead or empty handlers, unimported new components, DB writes without auth). Fix every BLOCK.
 - **CLI Commands (Terminal & Scripts)**:
   - `/fullstack-audit` or `npm run audit`: Regenerates the entire Fullstack Atlas and root `llms.txt` / `llms-full.txt`.
   - `npx fullstack-audit --adaptive`: Runs the Adaptive Domain Sniffer for non-web architectures.

@@ -6,6 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [Unreleased]
+
+### Added
+* **Unfinished-work gate** (`scripts/check.ts`): checks only the change set (`git diff HEAD` + untracked, `--staged`, or `--files`) for `DEAD_HANDLER` (on* handler or a call in it points at a name not defined or imported), `STUB_HANDLER` (empty body = BLOCK, log/alert-only = WARN), `ORPHAN_COMPONENT` (new `.tsx/.jsx` component nothing imports) and `UNGUARDED_MUTATION` (DB-writing server action or mutating API route with no auth call; runs only when an auth library is a dependency, WARN when `middleware.ts`/`proxy.ts` exists). `// fullstack-check-ignore` silences a line.
+* Same engine, four entry points: MCP tool `fullstack_check`; CLI `--check [--staged] [--files] [--json]` (exit 1 only on BLOCK); Claude Code `Stop` hook `bin/check-hook.js` (files the agent edited this session, recorded by `refresh-hook.js`; exit 2 on BLOCK, honours `stop_hook_active`, opt out `FULLSTACK_AUDIT_NO_CHECK=1`); `--install-precommit` for any harness.
+* `ServerAction` now carries `hasAuth` and `writesDb` (`scripts/audit-backend.ts`).
+* Rule files and generated `AGENTS.md` gain a "Before saying done" step. Installers fetch `check.ts` and `dist/{check,audit-backend,safe-walk}.js`.
+* Tests: `test/check.test.mjs` (8). Whole-repo run on the bench app (751 files): 0 findings, 5.5 s.
+
+---
+
 ## [2.17.2] - 2026-11-09
 
 ### Fixed

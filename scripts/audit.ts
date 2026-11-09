@@ -4460,6 +4460,9 @@ export function generateDynamicRuleBlock(profileOpts: ProfileOptions = resolvePr
   lines.push("### Keeping the atlas fresh");
   lines.push("- Run the `fullstack_audit` tool (or `/fullstack-audit`) after adding routes, pages, components or DB models, or when lookups look stale.");
   lines.push("");
+  lines.push("### Before saying done");
+  lines.push("- Call the `fullstack_check` tool (or `npx fullstack-audit --check`) on your changes and fix every BLOCK item (dead or empty handlers, new components nothing imports, DB writes without an auth check).");
+  lines.push("");
   lines.push("### Editing and verifying");
   lines.push("- Edit with your normal edit tool. `fullstack_patch` is available when shell quoting gets in the way (for example PowerShell and `&`).");
   lines.push("- Verify in proportion to the change: a style or copy tweak can rely on the dev server's hot reload; changes to types, exports, logic, backend, DB or auth need the typecheck and tests (`npm run typecheck`, `npm test`) before you call them done.");

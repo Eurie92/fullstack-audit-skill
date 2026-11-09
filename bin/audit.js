@@ -21,6 +21,45 @@ if (args.includes("-v") || args.includes("--version")) {
   process.exit(0);
 }
 
+// --check: unfinished-work gate on the change set (see scripts/check.ts). Exit 1 only on BLOCK.
+async function runCheckCli() {
+  try {
+    const mod = await import("../dist/check.js");
+    return mod.cli(args);
+  } catch (e) {
+    if (e?.code !== "ERR_MODULE_NOT_FOUND") { console.error(`fullstack-check: skipped (${e?.message || e})`); return 0; }
+  }
+  const tsx = path.resolve(__dirname, "../node_modules/tsx/dist/cli.mjs");
+  if (!fs.existsSync(tsx)) { console.error("fullstack-check: skipped (dist/check.js missing; run npm run build)"); return 0; }
+  const r = spawnSync(process.execPath, [tsx, path.resolve(__dirname, "../scripts/check.ts"), ...args], { stdio: "inherit", shell: false });
+  return r.status === 1 ? 1 : 0;
+}
+
+// --install-precommit: add the check to .git/hooks/pre-commit (skips when hooks are managed elsewhere).
+function installPrecommit() {
+  const bin = path.resolve(__dirname, "audit.js").replace(/\\/g, "/");
+  // Missing bin (plugin moved/removed) must not block commits: only exit 1 on a real BLOCK.
+  const line = `if [ -f "${bin}" ]; then node "${bin}" --check --staged || exit 1; fi`;
+  const g = (a) => spawnSync("git", a, { encoding: "utf-8", shell: false });
+  const custom = (g(["config", "core.hooksPath"]).stdout || "").trim();
+  const dirOut = g(["rev-parse", "--git-path", "hooks"]);
+  if (dirOut.status !== 0) { console.error("Not a git repository."); return 1; }
+  if (custom) {
+    console.log(`core.hooksPath is set to ${custom} (husky or similar). Add this line to your pre-commit hook:\n  ${line}`);
+    return 0;
+  }
+  const hook = path.resolve(dirOut.stdout.trim(), "pre-commit");
+  const cur = fs.existsSync(hook) ? fs.readFileSync(hook, "utf-8") : "";
+  if (cur.includes("--check --staged")) { console.log(`Already installed: ${hook}`); return 0; }
+  fs.mkdirSync(path.dirname(hook), { recursive: true });
+  fs.writeFileSync(hook, (cur || "#!/bin/sh\n").replace(/\n?$/, "\n") + line + "\n", { mode: 0o755 });
+  console.log(`Installed fullstack-check in ${hook}`);
+  return 0;
+}
+
+if (args.includes("--install-precommit")) process.exit(installPrecommit());
+if (args.includes("--check")) process.exit(await runCheckCli());
+
 // Fast path: atlas lookups served from the compiled MCP tools (no tsx cold start).
 function argAfter(...flags) {
   for (const f of flags) {

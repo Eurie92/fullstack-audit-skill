@@ -6,5 +6,5 @@
     "rootDir": "scripts"
   },
   "include": [],
-  "files": ["scripts/mcp-server.ts"]
+  "files": ["scripts/mcp-server.ts", "scripts/check.ts"]
 }
